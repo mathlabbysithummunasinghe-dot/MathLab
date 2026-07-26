@@ -1227,6 +1227,9 @@
             </div>
         </div>
         <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-end">
+            <button id="install-app-btn" onclick="triggerAppInstall()" class="hidden bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 shadow-md shine-btn">
+                <i class="fa-solid fa-download"></i> <span id="install-app-btn-text">Install App</span>
+            </button>
             <button onclick="toggleLanguage()" class="bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold px-3.5 py-2 rounded-xl transition cursor-pointer flex items-center gap-2 shadow-md">
                 <i class="fa-solid fa-globe text-indigo-400"></i> <span id="lang-btn-text">සිංහල | English</span>
             </button>
@@ -2069,6 +2072,20 @@
                     <span class="text-[10px] font-bold text-slate-400 uppercase whitespace-nowrap"><i class="fa-solid fa-user-graduate mr-1.5 text-emerald-400"></i> Role</span>
                     <span id="modal-profile-role" class="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md whitespace-nowrap">Student</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- iOS "ADD TO HOME SCREEN" INSTRUCTIONS MODAL (iOS Safari has no install prompt API) -->
+    <div id="ios-install-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-[#161224] border border-slate-800 p-6 sm:p-7 rounded-3xl w-full max-w-sm space-y-4 text-center shadow-2xl relative">
+            <button onclick="closeIosInstallModal()" class="absolute top-4 right-4 w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer transition"><i class="fa-solid fa-xmark"></i></button>
+            <div class="w-14 h-14 rounded-2xl overflow-hidden mx-auto shadow-inner"><img src="" id="ios-install-logo" alt="MathLab" class="w-full h-full object-cover"></div>
+            <h3 class="text-sm font-black text-white" id="ios-install-title">Install MathLab</h3>
+            <div class="text-left space-y-3 text-xs text-slate-300">
+                <p class="flex items-center gap-2.5"><span class="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-[10px] font-bold shrink-0">1</span> <span id="ios-step-1">Safari එකේ පහළ <i class="fa-solid fa-arrow-up-from-bracket mx-1"></i> (Share) icon එක Tap කරන්න</span></p>
+                <p class="flex items-center gap-2.5"><span class="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-[10px] font-bold shrink-0">2</span> <span id="ios-step-2">"Add to Home Screen" තෝරන්න</span></p>
+                <p class="flex items-center gap-2.5"><span class="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-[10px] font-bold shrink-0">3</span> <span id="ios-step-3">"Add" click කරන්න — ඉවරයි!</span></p>
             </div>
         </div>
     </div>
@@ -3952,6 +3969,13 @@
             const t = translations[currentLang];
             document.getElementById('html-root').setAttribute('lang', currentLang);
             document.getElementById('lang-btn-text').innerText = t.langBtn;
+            document.getElementById('install-app-btn-text').innerText = currentLang === 'si' ? 'App එක Install කරන්න' : 'Install App';
+            document.getElementById('ios-install-title').innerText = currentLang === 'si' ? 'MathLab Install කරන්න' : 'Install MathLab';
+            document.getElementById('ios-step-1').innerHTML = currentLang === 'si'
+                ? 'Safari එකේ පහළ <i class="fa-solid fa-arrow-up-from-bracket mx-1"></i> (Share) icon එක Tap කරන්න'
+                : 'Tap the <i class="fa-solid fa-arrow-up-from-bracket mx-1"></i> (Share) icon at the bottom of Safari';
+            document.getElementById('ios-step-2').innerText = currentLang === 'si' ? '"Add to Home Screen" තෝරන්න' : 'Choose "Add to Home Screen"';
+            document.getElementById('ios-step-3').innerText = currentLang === 'si' ? '"Add" click කරන්න — ඉවරයි!' : 'Tap "Add" — that\'s it!';
             document.getElementById('txt-welcome').innerText = t.welcome;
             document.getElementById('txt-portal-sub').innerText = t.portalSub;
             document.getElementById('tab-login-btn').innerText = t.loginTab;
@@ -4112,6 +4136,54 @@
             if (currentUser && currentUser.xp === undefined) currentUser.xp = 0;
             if (currentUser && !currentUser.badges) currentUser.badges = [];
             if (!progressGraphConfig || typeof progressGraphConfig.scope === 'undefined') progressGraphConfig = { scope: 'all' };
+        }
+
+        /* ============ PWA "INSTALL APP" BUTTON ============
+           Chrome/Edge/Android fire beforeinstallprompt when the site qualifies as
+           installable — we capture that event and re-trigger it from our own button
+           instead of waiting for the browser's own (easy-to-miss) mini-infobar.
+           iOS Safari has no such API at all, so it gets manual instructions instead. */
+        let deferredInstallPrompt = null;
+        const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+        const isStandaloneAlready = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            const btn = document.getElementById('install-app-btn');
+            if (btn && !isStandaloneAlready) btn.classList.remove('hidden');
+        });
+
+        window.addEventListener('appinstalled', () => {
+            deferredInstallPrompt = null;
+            const btn = document.getElementById('install-app-btn');
+            if (btn) btn.classList.add('hidden');
+            showToast(currentLang === 'si' ? 'MathLab install කළා! 🎉' : 'MathLab installed! 🎉', 'success');
+        });
+
+        function triggerAppInstall() {
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                deferredInstallPrompt.userChoice.finally(() => { deferredInstallPrompt = null; });
+            } else if (isIOSDevice) {
+                document.getElementById('ios-install-logo').src = MATHLAB_LOGO_DATA_URI;
+                document.getElementById('ios-install-modal').classList.remove('hidden');
+            } else {
+                showToast(currentLang === 'si'
+                    ? 'ඔබේ browser එකේ menu එකේ "Install App" හෝ "Add to Home Screen" option එක බලන්න.'
+                    : 'Check your browser\'s menu for "Install App" or "Add to Home Screen".', 'info');
+            }
+        }
+        function closeIosInstallModal() { document.getElementById('ios-install-modal').classList.add('hidden'); }
+
+        // iOS never fires beforeinstallprompt, so show the button there unconditionally
+        // (unless already running installed/standalone) rather than waiting for an event
+        // that will never come.
+        if (isIOSDevice && !isStandaloneAlready) {
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('install-app-btn');
+                if (btn) btn.classList.remove('hidden');
+            });
         }
 
         function applyBrandLogo() {
