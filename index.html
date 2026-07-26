@@ -44,7 +44,6 @@
          across devices/browsers, since localStorage alone is per-device only. -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-storage-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
     <!-- Desmos Graphing Calculator (free embeddable API) — used by the in-app
          "Graphing Calculator" tool so students can plot algebra/geometry graphs. -->
@@ -2591,6 +2590,15 @@
         // right after logout in the same tab) can still verify credentials without a network round-trip.
         let lastFullCloudUsers = null;
 
+        /* ============ FILE STORAGE — Cloudflare R2 (via a small Worker proxy) ============
+           PDF/image uploads go through a Cloudflare Worker (not directly to R2), because R2
+           needs real API credentials that can't safely live in a public static file — the
+           Worker holds those as server-side secrets and only exposes one narrow "upload a
+           PDF/image" action. See SETUP_GUIDE.md for how to deploy the Worker; fill in the
+           two values below once it's live. */
+        const R2_WORKER_URL = "https://mathlab-uploads-worker.mathlabbysithummunasinghe.workers.dev";
+        const R2_UPLOAD_SECRET = "MathLab2026SecureUpload!xk9";
+
         function initFirebaseSync() {
             try {
                 if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
@@ -2601,10 +2609,9 @@
                 window.db = firebase.firestore();
                 cloudDocRef = db.collection('moramaths').doc('sharedState');
 
-                // Storage is used to host uploaded PDF files (worksheets, past papers, etc.) —
-                // separate from Firestore, which only stores small JSON-style app data.
-                try { window.pdfStorage = firebase.storage(); storageReady = true; }
-                catch (storageErr) { console.warn('Firebase Storage init failed — PDF uploads will be unavailable.', storageErr); storageReady = false; }
+                // File uploads (PDFs/images) go through the R2 Worker configured above —
+                // "ready" just means both placeholders have been filled in.
+                storageReady = !R2_WORKER_URL.includes('PASTE_YOUR') && !R2_UPLOAD_SECRET.includes('PASTE_YOUR');
 
                 // Anonymous sign-in — this doesn't identify a person, it just gives Firestore
                 // something to check (request.auth != null) before allowing access, so the
@@ -4946,6 +4953,23 @@
            new-tab) keeps working unchanged whether the admin pasted a link OR uploaded
            a file. Files are hosted in Storage (not embedded as base64) so they don't
            blow past Firestore's 1MB-per-document limit and so larger PDFs are supported. */
+        /* Generic upload helper — POSTs the file to the R2 Worker (see R2_WORKER_URL above)
+           and resolves with the public URL Cloudflare R2 will serve it from. */
+        async function uploadFileToR2(file, folder, onProgress) {
+            const form = new FormData();
+            form.append('file', file);
+            form.append('folder', folder);
+            const res = await fetch(R2_WORKER_URL, {
+                method: 'POST',
+                headers: { 'X-Upload-Secret': R2_UPLOAD_SECRET },
+                body: form
+            });
+            let data;
+            try { data = await res.json(); } catch (e) { throw new Error('Unexpected response from upload server'); }
+            if (!res.ok) throw new Error(data.error || 'Upload failed');
+            return data.url;
+        }
+
         function handlePdfFileSelect(inputEl, targetFieldId, labelId, folder) {
             const file = inputEl.files && inputEl.files[0];
             if (!file) return;
@@ -4964,41 +4988,29 @@
                 inputEl.value = '';
                 return;
             }
-            if (!storageReady || !window.pdfStorage) {
+            if (!storageReady) {
                 showToast(currentLang === 'si'
-                    ? "File upload සක්‍රීය කර නැත (Firebase Storage setup කර නොමැත). වෙනුවට PDF Link එකක් paste කරන්න."
-                    : "File upload isn't enabled yet (Firebase Storage not set up). Please paste a PDF link instead for now.", 'error');
+                    ? "File upload සක්‍රීය කර නැත (R2 Worker setup කර නොමැත). වෙනුවට PDF Link එකක් paste කරන්න."
+                    : "File upload isn't enabled yet (R2 Worker not set up). Please paste a PDF link instead for now.", 'error');
                 inputEl.value = '';
                 return;
             }
-            if (labelEl) labelEl.innerText = currentLang === 'si' ? 'Upload කරමින්... 0%' : 'Uploading... 0%';
-            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const path = `${folder || 'lesson-pdfs'}/${Date.now()}_${safeName}`;
-            const task = window.pdfStorage.ref(path).put(file, { contentType: 'application/pdf' });
-            task.on('state_changed', (snap) => {
-                const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-                if (labelEl) labelEl.innerText = (currentLang === 'si' ? 'Upload කරමින්... ' : 'Uploading... ') + pct + '%';
-            }, (err) => {
+            if (labelEl) labelEl.innerText = currentLang === 'si' ? 'Upload කරමින්...' : 'Uploading...';
+            uploadFileToR2(file, folder || 'lesson-pdfs').then(url => {
+                document.getElementById(targetFieldId).value = url;
+                if (labelEl) labelEl.innerText = `✓ ${file.name}`;
+                showToast(currentLang === 'si' ? "PDF එක upload කරන ලදී!" : "PDF uploaded!", 'success');
+            }).catch(err => {
                 console.warn('PDF upload failed:', err);
                 resetLabel();
-                showToast((currentLang === 'si' ? "PDF upload අසාර්ථකයි: " : "PDF upload failed: ") + (err && err.code ? err.code : (err && err.message) || 'unknown error'), 'error');
+                showToast((currentLang === 'si' ? "PDF upload අසාර්ථකයි: " : "PDF upload failed: ") + (err && err.message || 'unknown error'), 'error');
                 inputEl.value = '';
-            }, () => {
-                task.snapshot.ref.getDownloadURL().then(url => {
-                    document.getElementById(targetFieldId).value = url;
-                    if (labelEl) labelEl.innerText = `✓ ${file.name}`;
-                    showToast(currentLang === 'si' ? "PDF එක upload කරන ලදී!" : "PDF uploaded!", 'success');
-                }).catch(err => {
-                    console.warn('Failed to get PDF download URL:', err);
-                    resetLabel();
-                    showToast((currentLang === 'si' ? "PDF upload අසාර්ථකයි: " : "PDF upload failed: ") + (err && err.code ? err.code : 'unknown error'), 'error');
-                });
             });
         }
 
-        /* ============ GENERIC IMAGE UPLOAD (Firebase Storage) ============
+        /* ============ GENERIC IMAGE UPLOAD (Cloudflare R2 via Worker) ============
            Reusable for any "paste an image URL" field in the admin panel — pass a
-           callback that receives the resulting download URL and does whatever that
+           callback that receives the resulting public URL and does whatever that
            field normally does with a pasted link (e.g. setWeekThumbnail). Keeping the
            URL-paste field alongside this means admins can still use Google Drive/imgbb
            links if they prefer, without being forced to upload through here. */
@@ -5017,33 +5029,24 @@
                 inputEl.value = '';
                 return;
             }
-            if (!storageReady || !window.pdfStorage) {
+            if (!storageReady) {
                 showToast(currentLang === 'si'
-                    ? "File upload සක්‍රීය කර නැත (Firebase Storage setup කර නොමැත). වෙනුවට Image Link එකක් paste කරන්න."
-                    : "File upload isn't enabled yet (Firebase Storage not set up). Please paste an image link instead for now.", 'error');
+                    ? "File upload සක්‍රීය කර නැත (R2 Worker setup කර නොමැත). වෙනුවට Image Link එකක් paste කරන්න."
+                    : "File upload isn't enabled yet (R2 Worker not set up). Please paste an image link instead for now.", 'error');
                 inputEl.value = '';
                 return;
             }
             setSpinning(true);
-            const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-            const path = `images/${Date.now()}_${safeName}`;
-            const task = window.pdfStorage.ref(path).put(file, { contentType: file.type });
-            task.on('state_changed', () => {}, (err) => {
+            uploadFileToR2(file, 'images').then(url => {
+                setSpinning(false);
+                inputEl.value = '';
+                onUploaded(url);
+                showToast(currentLang === 'si' ? "Image upload කරන ලදී!" : "Image uploaded!", 'success');
+            }).catch(err => {
                 console.warn('Image upload failed:', err);
                 setSpinning(false);
-                showToast((currentLang === 'si' ? "Image upload අසාර්ථකයි: " : "Image upload failed: ") + (err && err.code ? err.code : (err && err.message) || 'unknown error'), 'error');
+                showToast((currentLang === 'si' ? "Image upload අසාර්ථකයි: " : "Image upload failed: ") + (err && err.message || 'unknown error'), 'error');
                 inputEl.value = '';
-            }, () => {
-                task.snapshot.ref.getDownloadURL().then(url => {
-                    setSpinning(false);
-                    inputEl.value = '';
-                    onUploaded(url);
-                    showToast(currentLang === 'si' ? "Image upload කරන ලදී!" : "Image uploaded!", 'success');
-                }).catch(err => {
-                    console.warn('Failed to get image download URL:', err);
-                    setSpinning(false);
-                    showToast((currentLang === 'si' ? "Image upload අසාර්ථකයි: " : "Image upload failed: ") + (err && err.code ? err.code : 'unknown error'), 'error');
-                });
             });
         }
 
