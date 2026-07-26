@@ -1937,12 +1937,21 @@
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Login Screen Hero Image URL</label>
                                 <input type="text" id="admin-hero-image" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition" placeholder="හිස්ව තියන්න default illustration එකට">
+                                <label class="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-indigo-300 hover:text-indigo-200 cursor-pointer transition w-fit">
+                                    <i class="fa-solid fa-upload"></i> <span id="admin-hero-upload-label">පින්තූරයක් Upload කරන්න</span>
+                                    <input type="file" accept="image/*" class="hidden" onchange="handleImageFileSelect(this, 'admin-hero-image', 'admin-hero-upload-label', 'site-appearance')">
+                                </label>
                             </div>
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Dashboard Banner Image URL</label>
                                 <input type="text" id="admin-dashboard-banner" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition" placeholder="හිස්ව තියන්න default pattern එකට">
+                                <label class="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-indigo-300 hover:text-indigo-200 cursor-pointer transition w-fit">
+                                    <i class="fa-solid fa-upload"></i> <span id="admin-banner-upload-label">පින්තූරයක් Upload කරන්න</span>
+                                    <input type="file" accept="image/*" class="hidden" onchange="handleImageFileSelect(this, 'admin-dashboard-banner', 'admin-banner-upload-label', 'site-appearance')">
+                                </label>
                             </div>
                         </div>
+                        <p class="text-[9px] text-amber-400/80 leading-relaxed"><i class="fa-solid fa-triangle-exclamation mr-1"></i> URL එකක් manually paste කරනවා නම්: dash.cloudflare.com වගේ dashboard link එකක් දාන්න එපා — ඒක login අවශ්‍ය පිටුවක් විතරයි, image එක load වෙන්නේ නෑ. උඩින්ම තියෙන "Upload කරන්න" button එකෙන් file එක තෝරන එක තමයි ලේසිම සහ නිවැරදිම ක්‍රමය.</p>
                         <button onclick="saveSiteAppearance()" class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-6 py-3 rounded-xl transition cursor-pointer shadow-lg"><i class="fa-solid fa-floppy-disk mr-1"></i> Save Appearance</button>
                     </div>
                 </div>
@@ -5067,6 +5076,43 @@
             return data.url;
         }
 
+        function handleImageFileSelect(inputEl, targetFieldId, labelId, folder) {
+            const file = inputEl.files && inputEl.files[0];
+            if (!file) return;
+            const labelEl = labelId ? document.getElementById(labelId) : null;
+            const resetLabel = () => {
+                if (labelEl) labelEl.innerText = currentLang === 'si' ? 'පින්තූරයක් Upload කරන්න' : 'Upload an image';
+            };
+            if (!file.type.startsWith('image/')) {
+                showToast(currentLang === 'si' ? "කරුණාකර පින්තූර file එකක් තෝරන්න." : "Please choose an image file.", 'error');
+                inputEl.value = ''; resetLabel();
+                return;
+            }
+            const MAX_BYTES = 8 * 1024 * 1024; // 8MB — generous for a banner/hero photo
+            if (file.size > MAX_BYTES) {
+                showToast(currentLang === 'si' ? "පින්තූරය ඉතා විශාලයි (8MB ට වඩා අඩුවෙන් තෝරන්න)." : "Image is too large (please choose under 8MB).", 'error');
+                inputEl.value = ''; resetLabel();
+                return;
+            }
+            if (!storageReady) {
+                showToast(currentLang === 'si'
+                    ? "File upload සක්‍රීය කර නැත (R2 Worker setup කර නොමැත). වෙනුවට Image Link එකක් paste කරන්න."
+                    : "File upload isn't enabled yet (R2 Worker not set up). Please paste an image link instead for now.", 'error');
+                inputEl.value = ''; resetLabel();
+                return;
+            }
+            if (labelEl) labelEl.innerText = currentLang === 'si' ? 'Upload කරමින්...' : 'Uploading...';
+            uploadFileToR2(file, folder || 'site-images').then(url => {
+                document.getElementById(targetFieldId).value = url;
+                if (labelEl) labelEl.innerText = `✓ ${file.name}`;
+                showToast(currentLang === 'si' ? "පින්තූරය upload කරන ලදී!" : "Image uploaded!", 'success');
+            }).catch(err => {
+                console.error('Image upload error:', err);
+                showToast(currentLang === 'si' ? `Upload එක අසාර්ථකයි: ${err.message}` : `Upload failed: ${err.message}`, 'error');
+                resetLabel();
+            }).finally(() => { inputEl.value = ''; });
+        }
+
         function handlePdfFileSelect(inputEl, targetFieldId, labelId, folder) {
             const file = inputEl.files && inputEl.files[0];
             if (!file) return;
@@ -6993,7 +7039,7 @@
             const heroSlot = document.getElementById('auth-hero-visual');
             if (heroSlot) {
                 heroSlot.innerHTML = siteAssets.heroImage
-                    ? `<img src="${siteAssets.heroImage}" alt="MathLab" class="w-full h-full object-cover rounded-3xl">`
+                    ? `<img src="${siteAssets.heroImage}" alt="MathLab" class="w-full h-full object-cover rounded-3xl" onerror="this.closest('#auth-hero-visual').innerHTML = defaultHeroIllustrationSVG;">`
                     : defaultHeroIllustrationSVG;
             }
             const banner = document.getElementById('dashboard-banner-layer');
