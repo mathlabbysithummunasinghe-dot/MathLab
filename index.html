@@ -3633,6 +3633,10 @@
             if (!canvas) return;
             matrixCtx = canvas.getContext('2d');
             resizeMatrixCanvas();
+            // Pre-render a burst of frames instantly (before the canvas is shown) so it
+            // starts already "full" top-to-bottom with settled trails, instead of the
+            // visible fade-in taking a couple of seconds and looking sparse/cut-off at first.
+            for (let i = 0; i < 40; i++) drawMatrixFrame();
             canvas.classList.remove('opacity-0');
             canvas.classList.add('opacity-100');
             if (matrixTimer) clearInterval(matrixTimer);
@@ -3648,7 +3652,12 @@
             }
         }
 
-        window.addEventListener('resize', () => { if (matrixTimer) resizeMatrixCanvas(); });
+        window.addEventListener('resize', () => {
+            if (matrixTimer) {
+                resizeMatrixCanvas();
+                for (let i = 0; i < 40; i++) drawMatrixFrame();
+            }
+        });
 
         function toTitleCase(str) {
             if (!str) return '';
@@ -5068,6 +5077,41 @@
            blow past Firestore's 1MB-per-document limit and so larger PDFs are supported. */
         /* Generic upload helper — POSTs the file to the R2 Worker (see R2_WORKER_URL above)
            and resolves with the public URL Cloudflare R2 will serve it from. */
+        /* Browsers ignore the <a download> attribute for cross-origin URLs (like our R2
+           bucket), so it just opens/views the file instead of downloading it. Fetching
+           the file ourselves and downloading it as a blob works around that. */
+        /* Looks the paper up by ID at click-time instead of embedding its title text
+           directly into an inline onclick string — a title containing an apostrophe
+           would otherwise break that inline JS silently. */
+        function downloadPastPaperById(paperId) {
+            for (const y of pastPapersData) {
+                const p = (y.papers || []).find(x => x.id === paperId);
+                if (p) { forceDownloadFile(p.pdf, `${p.title}.pdf`); return; }
+            }
+        }
+
+        async function forceDownloadFile(url, filename) {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Fetch failed');
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = filename || 'download.pdf';
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+            } catch (err) {
+                console.error('Download failed, falling back to opening in a new tab:', err);
+                showToast(currentLang === 'si' ? "Direct download එක අසාර්ථකයි — file එක tab එකක open කරමින්..." : "Direct download failed — opening the file in a new tab instead...", 'error');
+                // Fallback: if the fetch fails (e.g. CORS not enabled on the source), just
+                // open it in a new tab so the person can still save it manually.
+                window.open(url, '_blank');
+            }
+        }
+
         async function uploadFileToR2(file, folder, onProgress) {
             const form = new FormData();
             form.append('file', file);
@@ -5681,7 +5725,7 @@
                                 <span class="text-xs font-bold text-slate-200">${escapeHtml(p.title)}</span>
                                 <div class="flex items-center gap-2 shrink-0">
                                     <a href="${escapeHtml(p.pdf)}" target="_blank" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-3 py-1.5 rounded-lg border border-indigo-500/30 transition"><i class="fa-solid fa-file-pdf mr-1"></i> ${currentLang === 'si' ? 'බලන්න' : 'View'}</a>
-                                    <a href="${escapeHtml(p.pdf)}" download target="_blank" class="bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white text-[10px] font-bold px-3 py-1.5 rounded-lg border border-slate-700 hover:border-emerald-500/30 transition"><i class="fa-solid fa-download mr-1"></i> ${currentLang === 'si' ? 'Download' : 'Download'}</a>
+                                    <button onclick="downloadPastPaperById('${p.id}')" class="bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white text-[10px] font-bold px-3 py-1.5 rounded-lg border border-slate-700 hover:border-emerald-500/30 transition"><i class="fa-solid fa-download mr-1"></i> Download</button>
                                 </div>
                             </div>`;
                         }).join('') || `<p class="text-[10px] text-slate-600 italic">${currentLang === 'si' ? 'මෙම වසර සඳහා ප්‍රශ්න පත්‍ර නොමැත.' : 'No papers added for this year yet.'}</p>`}
