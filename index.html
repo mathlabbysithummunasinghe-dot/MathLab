@@ -4843,20 +4843,22 @@
             const t = translations[currentLang];
             weeksData.forEach((w, idx) => {
                 const isLocked = w.isLocked;
-                const thumbHtml = `<div class="-m-5 mb-1 h-24 relative overflow-hidden bg-gradient-to-br from-indigo-600/20 to-purple-600/10 flex items-center justify-center text-indigo-500/40 text-2xl">
+                const thumbHtml = `<div class="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-purple-600/10 flex items-center justify-center text-indigo-500/40 text-2xl">
                         <i class="fa-solid fa-image"></i>
                         ${w.thumbnail ? `<img src="${escapeHtml(w.thumbnail)}" alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover ${isLocked ? 'grayscale opacity-50' : ''}" onerror="this.style.display='none'">` : ''}
-                        <div class="absolute inset-0 bg-gradient-to-t from-[#161224] to-transparent"></div>
+                        <div class="absolute inset-0 bg-gradient-to-t from-[#0b0914] via-[#0b0914]/70 to-[#0b0914]/20"></div>
                     </div>`;
                 grid.innerHTML += `
-                    <div onclick="handleWeekClick(${idx})" class="week-thumb-wrap bg-[#161224]/80 backdrop-blur-md border ${isLocked ? 'border-slate-800/80 opacity-60' : 'border-slate-800/80 hover:border-indigo-500/60 hover:-translate-y-1'} p-5 rounded-2xl cursor-pointer transition-all duration-300 shadow-xl group space-y-3 relative overflow-hidden">
+                    <div onclick="handleWeekClick(${idx})" class="week-thumb-wrap border ${isLocked ? 'border-slate-800/80 opacity-60' : 'border-slate-800/80 hover:border-indigo-500/60 hover:-translate-y-1'} rounded-2xl cursor-pointer transition-all duration-300 shadow-xl group relative overflow-hidden min-h-[132px] flex flex-col justify-end">
                         ${thumbHtml}
-                        <div class="flex justify-between items-center z-10 relative">
-                            <span class="text-[10px] font-bold ${isLocked ? 'bg-[#0f0c1a] text-slate-400' : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'} px-2.5 py-1 rounded-lg whitespace-nowrap">Week ${w.week}</span>
-                            ${isLocked ? '<i class="fa-solid fa-lock text-rose-400 text-xs"></i>' : '<i class="fa-solid fa-unlock text-emerald-400 text-xs"></i>'}
+                        <div class="p-5 space-y-3 z-10 relative">
+                            <div class="flex justify-between items-center">
+                                <span class="text-[10px] font-bold ${isLocked ? 'bg-[#0f0c1a] text-slate-400' : 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'} px-2.5 py-1 rounded-lg whitespace-nowrap">Week ${w.week}</span>
+                                ${isLocked ? '<i class="fa-solid fa-lock text-rose-400 text-xs"></i>' : '<i class="fa-solid fa-unlock text-emerald-400 text-xs"></i>'}
+                            </div>
+                            <h4 class="text-xs font-extrabold text-white group-hover:text-indigo-300 transition line-clamp-1">${escapeHtml(w.title)}</h4>
+                            <p class="text-[10px] text-slate-300">${isLocked ? t.lockedText : `${w.lessons.length} ${currentLang === 'si' ? 'පාඩම් / PDFs ඇත' : 'Lessons / PDFs'}`}</p>
                         </div>
-                        <h4 class="text-xs font-extrabold text-white group-hover:text-indigo-300 transition line-clamp-1 z-10 relative">${escapeHtml(w.title)}</h4>
-                        <p class="text-[10px] text-slate-400 z-10 relative">${isLocked ? t.lockedText : `${w.lessons.length} ${currentLang === 'si' ? 'පාඩම් / PDFs ඇත' : 'Lessons / PDFs'}`}</p>
                     </div>
                 `;
             });
@@ -5157,7 +5159,7 @@
            field normally does with a pasted link (e.g. setWeekThumbnail). Keeping the
            URL-paste field alongside this means admins can still use Google Drive/imgbb
            links if they prefer, without being forced to upload through here. */
-        function handleImageFileSelect(inputEl, onUploaded, iconEl) {
+        function handleGenericImageFileSelect(inputEl, onUploaded, iconEl) {
             const file = inputEl.files && inputEl.files[0];
             if (!file) return;
             const setSpinning = (spinning) => { if (iconEl) iconEl.className = spinning ? 'fa-solid fa-spinner fa-spin' : 'fa-solid fa-upload'; };
@@ -5194,7 +5196,7 @@
         }
 
         function handleWeekThumbnailUpload(inputEl, weekIdx) {
-            handleImageFileSelect(inputEl, (url) => setWeekThumbnail(weekIdx, url), inputEl.previousElementSibling);
+            handleGenericImageFileSelect(inputEl, (url) => setWeekThumbnail(weekIdx, url), inputEl.previousElementSibling);
         }
 
         /* ============ GOOGLE DRIVE LINK HELPER ============
