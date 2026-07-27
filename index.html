@@ -1341,6 +1341,11 @@
         <div id="student-dashboard" class="hidden w-full max-w-6xl space-y-6">
             <div class="bg-gradient-to-r from-[#181329] via-[#161224] to-[#211736] border border-slate-800/80 rounded-3xl p-6 sm:p-8 text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
                 <div id="dashboard-banner-layer" class="absolute inset-0 pointer-events-none"></div>
+                <!-- Ambient decorative glows — keep the banner feeling designed/full even
+                     when no custom banner image is set, or when the image is subtle. -->
+                <div class="absolute -top-16 -right-10 w-64 h-64 bg-indigo-600/25 rounded-full blur-[90px] pointer-events-none"></div>
+                <div class="absolute -bottom-20 left-1/4 w-72 h-72 bg-fuchsia-600/15 rounded-full blur-[100px] pointer-events-none"></div>
+                <div class="absolute inset-0 opacity-40 pointer-events-none" style="background: radial-gradient(circle at 15% 15%, rgba(129,140,248,0.18), transparent 45%);"></div>
                 <div class="relative flex items-center space-x-5 cursor-pointer hover:bg-white/5 p-4 rounded-2xl transition border border-transparent hover:border-slate-800/80 group z-10 w-full md:w-auto" onclick="openProfileModal()">
                     <div class="w-16 h-16 bg-gradient-to-br from-indigo-600 to-purple-600 border border-indigo-400/40 text-yellow-300 rounded-2xl flex items-center justify-center text-2xl font-black shadow-lg group-hover:scale-105 transition shrink-0" id="student-avatar">S</div>
                     <div class="space-y-1 min-w-0">
@@ -3585,7 +3590,7 @@
                 quizSubmit: "Submit Answers",
                 quizResultPrefix: "Your score:",
                 quizClose: "Close",
-                heroHeadline: "Master O/L Mathematics<br>in Just 16 Weeks",
+                heroHeadline: "O/L Mathematics<br>in Just 16 Weeks",
                 heroSub: "Live Zoom classes, weekly quizzes, a leaderboard, and a complete 16-week revision plan — all in MathLab.",
                 heroChip1: "Live Classes",
                 heroChip2: "16 Weeks Complete",
@@ -3596,34 +3601,41 @@
         /* ============ MATRIX MATH RAIN (login screen background) ============ */
         let matrixCtx = null, matrixColumns = 0, matrixDrops = [], matrixSpeeds = [], matrixTimer = null;
         const matrixSymbols = ['π','∫','Σ','√','∆','θ','÷','×','∞','ƒ','α','β','λ','µ','1','0','x','y','%','=','+','−','²','½'];
+        const MATRIX_ROW = 22, MATRIX_TRAIL = 16;
 
         function resizeMatrixCanvas() {
             const canvas = document.getElementById('matrix-canvas');
             if (!canvas) return;
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            matrixColumns = Math.floor(canvas.width / 22);
-            const rowCount = canvas.height / 22;
-            // Spread starting rows across the FULL height (not just above the screen) so the
-            // rain already fills the whole canvas top-to-bottom on the very first frame,
-            // instead of needing several seconds to "fall into place".
+            matrixColumns = Math.floor(canvas.width / MATRIX_ROW);
+            const rowCount = canvas.height / MATRIX_ROW;
             matrixDrops = new Array(matrixColumns).fill(0).map(() => Math.random() * rowCount);
-            matrixSpeeds = new Array(matrixColumns).fill(0).map(() => 0.6 + Math.random() * 0.9);
+            matrixSpeeds = new Array(matrixColumns).fill(0).map(() => 0.5 + Math.random() * 0.8);
         }
 
+        /* Each column draws its own short trail (brightest at the head, fading upward)
+           fully on every single frame — instead of leaning on a semi-transparent overlay
+           to build up a trail over many frames. That old approach left a "dead" empty
+           band wherever a column had recently moved away and nothing had refreshed it
+           yet (the visible horizontal seam). Drawing the whole trail every frame, and
+           wrapping each column with modulo instead of a random reset, means the canvas
+           is completely and evenly filled top-to-bottom from the very first frame. */
         function drawMatrixFrame() {
             const canvas = document.getElementById('matrix-canvas');
             if (!canvas || !matrixCtx) return;
-            matrixCtx.fillStyle = 'rgba(11,9,20,0.14)';
-            matrixCtx.fillRect(0, 0, canvas.width, canvas.height);
+            matrixCtx.clearRect(0, 0, canvas.width, canvas.height);
             matrixCtx.font = '15px "Plus Jakarta Sans", monospace';
+            const rowCount = canvas.height / MATRIX_ROW;
             for (let i = 0; i < matrixDrops.length; i++) {
-                const symbol = matrixSymbols[Math.floor(Math.random() * matrixSymbols.length)];
-                const y = matrixDrops[i] * 22;
-                const fade = Math.random() > 0.93;
-                matrixCtx.fillStyle = fade ? 'rgba(199,210,254,0.6)' : 'rgba(99,102,241,0.32)';
-                matrixCtx.fillText(symbol, i * 22, y);
-                if (y > canvas.height && Math.random() > 0.985) matrixDrops[i] = 0;
+                const head = matrixDrops[i];
+                for (let t = 0; t < MATRIX_TRAIL; t++) {
+                    const wrapped = (((head - t) % rowCount) + rowCount) % rowCount;
+                    const symbol = matrixSymbols[Math.floor(Math.random() * matrixSymbols.length)];
+                    const alpha = t === 0 ? 0.7 : 0.32 * (1 - t / MATRIX_TRAIL);
+                    matrixCtx.fillStyle = t === 0 ? `rgba(199,210,254,${alpha})` : `rgba(99,102,241,${alpha})`;
+                    matrixCtx.fillText(symbol, i * MATRIX_ROW, wrapped * MATRIX_ROW);
+                }
                 matrixDrops[i] += matrixSpeeds[i];
             }
         }
@@ -3633,10 +3645,7 @@
             if (!canvas) return;
             matrixCtx = canvas.getContext('2d');
             resizeMatrixCanvas();
-            // Pre-render a burst of frames instantly (before the canvas is shown) so it
-            // starts already "full" top-to-bottom with settled trails, instead of the
-            // visible fade-in taking a couple of seconds and looking sparse/cut-off at first.
-            for (let i = 0; i < 40; i++) drawMatrixFrame();
+            drawMatrixFrame();
             canvas.classList.remove('opacity-0');
             canvas.classList.add('opacity-100');
             if (matrixTimer) clearInterval(matrixTimer);
@@ -3655,7 +3664,7 @@
         window.addEventListener('resize', () => {
             if (matrixTimer) {
                 resizeMatrixCanvas();
-                for (let i = 0; i < 40; i++) drawMatrixFrame();
+                drawMatrixFrame();
             }
         });
 
@@ -5387,6 +5396,20 @@
             return Number(localStorage.getItem('moramaths_notif_seen_' + currentUser.username)) || 0;
         }
 
+        /* Mirrors the unread count onto the installed PWA's home-screen/taskbar icon
+           itself (the little red number badge apps show), using the browser's Badge
+           API. Not supported in every browser — silently does nothing where it isn't
+           (e.g. Firefox, iOS Safari), the in-app bell badge still works everywhere. */
+        function updateAppIconBadge() {
+            if (!('setAppBadge' in navigator)) return;
+            const lastSeen = getLastSeenNotifTime();
+            const unreadNotifs = notifications.filter(n => n.date > lastSeen).length;
+            const unreadMsgs = currentUser && !isAdminUser(currentUser) ? getUnreadAdminMessageCount(currentUser.username) : 0;
+            const total = unreadNotifs + unreadMsgs;
+            if (total > 0) navigator.setAppBadge(total).catch(() => {});
+            else navigator.clearAppBadge().catch(() => {});
+        }
+
         function renderNotifBell() {
             const badge = document.getElementById('notif-badge');
             const list = document.getElementById('notif-list');
@@ -5399,6 +5422,7 @@
             } else {
                 badge.classList.add('hidden');
             }
+            updateAppIconBadge();
             const t = translations[currentLang];
             if (notifications.length === 0) {
                 list.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">${t.notifEmpty}</p>`;
@@ -5958,6 +5982,7 @@
             const count = getUnreadAdminMessageCount(currentUser.username);
             badge.innerText = count > 9 ? '9+' : count;
             badge.classList.toggle('hidden', count === 0);
+            updateAppIconBadge();
         }
 
         function renderMessageThread() {
