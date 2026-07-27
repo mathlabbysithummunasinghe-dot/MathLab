@@ -5068,11 +5068,14 @@
             }
         }
 
-        /* Shows/hides the student-facing LIVE NOW banner based on zoomData.isLive. */
+        /* Shows/hides the student-facing LIVE NOW banner based on zoomData.isLive.
+           Also requires active subscription access — otherwise a locked-out student
+           would see a contradictory "Subscription needed" box right next to a
+           "Join Now, it's live!" banner. */
         function renderLiveBanner() {
             const banner = document.getElementById('live-broadcast-banner');
             if (!banner) return;
-            const isLive = !!zoomData.isLive && !!currentUser && !isAdminUser(currentUser);
+            const isLive = !!zoomData.isLive && !!currentUser && !isAdminUser(currentUser) && hasActiveAccess(currentUser);
             banner.classList.toggle('hidden', !isLive);
             if (isLive) {
                 document.getElementById('live-banner-join-btn').href = zoomData.link || '#';
