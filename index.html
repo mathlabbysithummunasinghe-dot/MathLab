@@ -2187,6 +2187,7 @@
                 <h3 id="modal-week-title" class="text-sm font-black text-white truncate">Week Lessons</h3>
                 <button onclick="closeWeekModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer transition shrink-0"><i class="fa-solid fa-xmark"></i></button>
             </div>
+            <div id="modal-recorded-class-btn"></div>
             <div id="modal-lessons-list" class="space-y-3 max-h-80 overflow-y-auto pr-1"></div>
         </div>
     </div>
@@ -4951,19 +4952,16 @@
                         <div class="absolute inset-0 bg-gradient-to-t from-[#0b0914] from-10% via-[#0b0914]/50 via-40% to-transparent"></div>
                     </div>`;
                 grid.innerHTML += `
-                    <div onclick="handleWeekClick(${idx})" class="week-thumb-wrap border ${isLocked ? 'border-slate-800/80 opacity-60' : 'border-slate-800/80 hover:border-indigo-500/60 hover:-translate-y-1'} rounded-2xl cursor-pointer transition-all duration-300 shadow-xl group overflow-hidden flex flex-col">
-                        <div class="aspect-video relative overflow-hidden">
-                            ${thumbHtml}
-                            <div class="absolute top-3 left-3 right-3 z-10 flex justify-between items-center">
-                                <span class="text-[10px] font-bold ${isLocked ? 'bg-[#0f0c1a]/90 text-slate-400' : 'bg-indigo-600/30 backdrop-blur-sm text-indigo-200 border border-indigo-500/40'} px-2.5 py-1 rounded-lg whitespace-nowrap shadow-md">Week ${w.week}</span>
-                                <span class="w-6 h-6 rounded-lg bg-[#0f0c1a]/80 backdrop-blur-sm flex items-center justify-center shadow-md shrink-0">${isLocked ? '<i class="fa-solid fa-lock text-rose-400 text-[10px]"></i>' : '<i class="fa-solid fa-unlock text-emerald-400 text-[10px]"></i>'}</span>
-                            </div>
-                            <div class="absolute bottom-0 left-0 right-0 z-10 bg-[#0b0914]/85 backdrop-blur-sm px-4 py-2.5">
-                                <h4 class="text-xs font-extrabold text-white group-hover:text-indigo-300 transition line-clamp-1">${escapeHtml(w.title)}</h4>
-                                <p class="text-[10px] text-slate-300">${isLocked ? t.lockedText : `${w.lessons.length} ${currentLang === 'si' ? 'පාඩම් / PDFs ඇත' : 'Lessons / PDFs'}`}</p>
-                            </div>
+                    <div onclick="handleWeekClick(${idx})" class="week-thumb-wrap aspect-video border ${isLocked ? 'border-slate-800/80 opacity-60' : 'border-slate-800/80 hover:border-indigo-500/60 hover:-translate-y-1'} rounded-2xl cursor-pointer transition-all duration-300 shadow-xl group relative overflow-hidden flex flex-col">
+                        ${thumbHtml}
+                        <div class="absolute top-3 left-3 right-3 z-10 flex justify-between items-center">
+                            <span class="text-[10px] font-bold ${isLocked ? 'bg-[#0f0c1a]/90 text-slate-400' : 'bg-indigo-600/30 backdrop-blur-sm text-indigo-200 border border-indigo-500/40'} px-2.5 py-1 rounded-lg whitespace-nowrap shadow-md">Week ${w.week}</span>
+                            <span class="w-6 h-6 rounded-lg bg-[#0f0c1a]/80 backdrop-blur-sm flex items-center justify-center shadow-md shrink-0">${isLocked ? '<i class="fa-solid fa-lock text-rose-400 text-[10px]"></i>' : '<i class="fa-solid fa-unlock text-emerald-400 text-[10px]"></i>'}</span>
                         </div>
-                        ${!isLocked ? `<button onclick="event.stopPropagation(); openRecordedClass(${idx})" class="w-full bg-[#161224] hover:bg-rose-600/20 border-t border-slate-800 text-slate-300 hover:text-rose-300 text-[11px] font-bold px-4 py-2.5 flex items-center justify-center gap-2 cursor-pointer transition"><i class="fa-solid fa-clapperboard text-rose-400"></i> ${currentLang === 'si' ? 'පටිගත කළ පංතිය' : 'Recorded Class'}</button>` : ''}
+                        <div class="mt-auto z-10 relative bg-[#0b0914]/85 backdrop-blur-sm px-4 py-3 space-y-1 border-t border-white/5">
+                            <h4 class="text-xs font-extrabold text-white group-hover:text-indigo-300 transition line-clamp-1">${escapeHtml(w.title)}</h4>
+                            <p class="text-[10px] text-slate-300">${isLocked ? t.lockedText : `${w.lessons.length} ${currentLang === 'si' ? 'පාඩම් / PDFs ඇත' : 'Lessons / PDFs'}`}</p>
+                        </div>
                     </div>
                 `;
             });
@@ -4982,6 +4980,10 @@
             const w = weeksData[index];
             const t = translations[currentLang];
             document.getElementById('modal-week-title').innerText = `Week ${w.week} - ${w.title}`;
+            const recBtnWrap = document.getElementById('modal-recorded-class-btn');
+            recBtnWrap.innerHTML = w.recordedVideo && w.recordedVideo.trim() !== ''
+                ? `<button onclick="openRecordedClass(${index})" class="w-full bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white text-xs font-bold py-3 rounded-xl border border-rose-500/30 transition flex items-center justify-center gap-2 cursor-pointer"><i class="fa-solid fa-clapperboard"></i> ${currentLang === 'si' ? 'පටිගත කළ පංතිය බලන්න' : 'Watch Recorded Class'}</button>`
+                : '';
             const list = document.getElementById('modal-lessons-list');
             list.innerHTML = '';
             w.lessons.forEach(l => {
