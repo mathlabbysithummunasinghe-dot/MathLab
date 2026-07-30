@@ -88,6 +88,7 @@
         .toast-leave { animation: toastOut 0.2s ease-in forwards; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .pop-in { animation: popIn 0.18s ease-out forwards; }
+        #recorded-class-watermark { transition: top 2.5s ease-in-out, left 2.5s ease-in-out; }
         .quiz-option { transition: all 0.15s ease; }
         .quiz-option:hover { transform: translateX(2px); }
         .quiz-option.correct-answer { background: rgba(16,185,129,0.18) !important; border-color: rgba(16,185,129,0.6) !important; }
@@ -2190,6 +2191,20 @@
         </div>
     </div>
 
+    <!-- RECORDED CLASS VIDEO MODAL -->
+    <div id="recorded-class-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-[#161224] border border-slate-800 p-4 sm:p-5 rounded-3xl w-full max-w-2xl space-y-3 shadow-2xl relative">
+            <div class="flex justify-between items-center gap-2">
+                <h3 id="recorded-class-title" class="text-sm font-black text-white truncate flex items-center gap-2"><i class="fa-solid fa-clapperboard text-rose-400"></i> Recorded Class</h3>
+                <button onclick="closeRecordedClassModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer transition shrink-0"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="aspect-video w-full rounded-2xl overflow-hidden border border-slate-800 bg-black relative">
+                <iframe id="recorded-class-iframe" class="w-full h-full" src="" title="Recorded Class" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                <div id="recorded-class-watermark" class="absolute top-0 left-0 pointer-events-none select-none text-white/40 text-[11px] sm:text-xs font-bold whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" style="z-index: 5;"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- QUIZ MODAL -->
     <div id="quiz-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
         <div class="bg-[#161224] border border-slate-800 p-6 sm:p-7 rounded-3xl w-full max-w-lg space-y-5 shadow-2xl relative pop-in">
@@ -4105,6 +4120,7 @@
             week: i + 1,
             title: currentLang === 'si' ? `සතිය ${i + 1} පුනරීක්ෂණය` : `Week ${i + 1} Revision`,
             thumbnail: "",
+            recordedVideo: "",
             isLocked: i !== 0,
             lessons: [
                 {
@@ -4941,6 +4957,7 @@
                             <span class="text-[10px] font-bold ${isLocked ? 'bg-[#0f0c1a]/90 text-slate-400' : 'bg-indigo-600/30 backdrop-blur-sm text-indigo-200 border border-indigo-500/40'} px-2.5 py-1 rounded-lg whitespace-nowrap shadow-md">Week ${w.week}</span>
                             <span class="w-6 h-6 rounded-lg bg-[#0f0c1a]/80 backdrop-blur-sm flex items-center justify-center shadow-md shrink-0">${isLocked ? '<i class="fa-solid fa-lock text-rose-400 text-[10px]"></i>' : '<i class="fa-solid fa-unlock text-emerald-400 text-[10px]"></i>'}</span>
                         </div>
+                        ${!isLocked ? `<button onclick="event.stopPropagation(); openRecordedClass(${idx})" title="${currentLang === 'si' ? 'පටිගත කළ පංතිය' : 'Recorded Class'}" class="absolute bottom-16 right-3 z-10 w-8 h-8 rounded-xl bg-rose-600/80 hover:bg-rose-500 backdrop-blur-sm text-white flex items-center justify-center shadow-lg cursor-pointer transition"><i class="fa-solid fa-clapperboard text-xs"></i></button>` : ''}
                         <div class="mt-auto z-10 relative bg-[#0b0914]/85 backdrop-blur-sm px-4 py-3 space-y-1 border-t border-white/5">
                             <h4 class="text-xs font-extrabold text-white group-hover:text-indigo-300 transition line-clamp-1">${escapeHtml(w.title)}</h4>
                             <p class="text-[10px] text-slate-300">${isLocked ? t.lockedText : `${w.lessons.length} ${currentLang === 'si' ? 'පාඩම් / PDFs ඇත' : 'Lessons / PDFs'}`}</p>
@@ -4972,7 +4989,7 @@
                         <span class="text-xs font-bold text-white sm:line-clamp-1 sm:flex-1 sm:min-w-0">${escapeHtml(l.title)}</span>
                         <div class="grid grid-cols-3 sm:flex gap-2 shrink-0">
                             <button onclick="viewLessonCode('${l.id}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer" title="Full-Screen Viewer"><i class="fa-solid fa-expand"></i> <span class="hidden xs:inline sm:inline">View</span></button>
-                            <a href="${l.pdf}" target="_blank" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-indigo-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap">${t.pdfBtn}</a>
+                            <button onclick="openLessonPdf('${l.id}')" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-indigo-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.pdfBtn}</button>
                             <button onclick="openQuizModal('${l.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.quizBtn}${scored ? ` ✓${scored.correct}/${scored.total}` : ''}</button>
                         </div>
                     </div>
@@ -4983,6 +5000,49 @@
 
         function closeWeekModal() {
             document.getElementById('week-modal').classList.add('hidden');
+        }
+
+        let recordedClassWatermarkTimer = null;
+
+        function moveRecordedClassWatermark() {
+            const el = document.getElementById('recorded-class-watermark');
+            if (!el) return;
+            // Keeps the watermark within a safe inner margin so it never gets clipped at the edges.
+            const top = 6 + Math.random() * 78;  // 6% - 84% from top
+            const left = 4 + Math.random() * 62; // 4% - 66% from left (text runs rightward from this point)
+            el.style.top = top + '%';
+            el.style.left = left + '%';
+        }
+
+        function openRecordedClass(index) {
+            const w = weeksData[index];
+            const url = w.recordedVideo;
+            if (!url || url.trim() === '') {
+                showToast(currentLang === 'si' ? "මෙම සතිය සඳහා පටිගත කළ පංතියක් තවම උඩුගත කර නොමැත" : "No recorded class has been uploaded for this week yet", 'error');
+                return;
+            }
+            const videoId = extractYouTubeId(url);
+            if (!videoId) {
+                showToast(currentLang === 'si' ? "Video link එක වැරදිය" : "Invalid video link", 'error');
+                return;
+            }
+            document.getElementById('recorded-class-title').innerHTML = `<i class="fa-solid fa-clapperboard text-rose-400"></i> Week ${w.week} - ${escapeHtml(w.title)}`;
+            document.getElementById('recorded-class-iframe').src = `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+
+            const studentId = (currentUser && currentUser.studentId) ? currentUser.studentId : '—';
+            const watermark = document.getElementById('recorded-class-watermark');
+            watermark.innerHTML = `${escapeHtml(studentId)} &bull; MathLab By Sithum Munasinghe`;
+            moveRecordedClassWatermark(); // set an initial position immediately
+            if (recordedClassWatermarkTimer) clearInterval(recordedClassWatermarkTimer);
+            recordedClassWatermarkTimer = setInterval(moveRecordedClassWatermark, 4000);
+
+            document.getElementById('recorded-class-modal').classList.remove('hidden');
+        }
+
+        function closeRecordedClassModal() {
+            document.getElementById('recorded-class-modal').classList.add('hidden');
+            document.getElementById('recorded-class-iframe').src = ''; // stop playback
+            if (recordedClassWatermarkTimer) { clearInterval(recordedClassWatermarkTimer); recordedClassWatermarkTimer = null; }
         }
 
         function viewLessonCode(lessonId) {
@@ -6611,6 +6671,15 @@
             return null;
         }
 
+        function openLessonPdf(lessonId) {
+            const lesson = findLesson(lessonId);
+            if (!lesson || !lesson.pdf || lesson.pdf.trim() === '' || lesson.pdf.trim() === '#') {
+                showToast(currentLang === 'si' ? "මෙම පාඩම සඳහා PDF එකක් තවම උඩුගත කර නොමැත" : "No PDF has been uploaded for this lesson yet", 'error');
+                return;
+            }
+            window.open(lesson.pdf, '_blank');
+        }
+
         function openQuizModal(lessonId) {
             const lesson = findLesson(lessonId);
             if (!lesson) return;
@@ -6715,6 +6784,11 @@
                         </label>
                         ${w.thumbnail ? `<button onclick="setWeekThumbnail(${wi}, '')" title="Remove thumbnail" class="shrink-0 w-6 h-6 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white flex items-center justify-center text-[10px] cursor-pointer transition"><i class="fa-solid fa-xmark"></i></button>` : ''}
                     </div>
+                    <div class="flex items-center gap-2.5 bg-[#161224] border border-slate-800 rounded-xl px-3 py-2">
+                        <i class="fa-solid fa-clapperboard text-rose-400 text-xs shrink-0"></i>
+                        <input value="${escapeHtml(w.recordedVideo || '')}" onchange="setWeekRecordedVideo(${wi}, this.value)" placeholder="${currentLang === 'si' ? 'Recorded class YouTube link (Unlisted)...' : 'Recorded class YouTube link (Unlisted)...'}" class="bg-transparent text-[11px] text-slate-300 flex-1 min-w-0 focus:outline-none">
+                        ${w.recordedVideo ? `<button onclick="setWeekRecordedVideo(${wi}, '')" title="Remove video" class="shrink-0 w-6 h-6 rounded-lg bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white flex items-center justify-center text-[10px] cursor-pointer transition"><i class="fa-solid fa-xmark"></i></button>` : ''}
+                    </div>
                     <div class="space-y-1.5">
                         ${w.lessons.map(l => `
                             <div class="flex items-center justify-between gap-2 bg-[#161224] border border-slate-800 rounded-xl px-3 py-2">
@@ -6737,6 +6811,21 @@
             renderWeeksGrid();
             renderAdminWeeksManager();
             showToast(url.trim() ? "Thumbnail updated" : "Thumbnail removed", 'success');
+        }
+
+        function setWeekRecordedVideo(weekIdx, url) {
+            url = url.trim();
+            if (url && !extractYouTubeId(url)) {
+                showToast(currentLang === 'si' ? "වලංගු YouTube link එකක් දාන්න" : "Please enter a valid YouTube link", 'error');
+                renderAdminWeeksManager();
+                return;
+            }
+            weeksData[weekIdx].recordedVideo = url;
+            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            cloudPush();
+            renderWeeksGrid();
+            renderAdminWeeksManager();
+            showToast(url ? "Recorded class video updated" : "Recorded class video removed", 'success');
         }
 
         function renameWeek(weekIdx, newTitle) {
