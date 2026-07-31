@@ -5320,14 +5320,20 @@
             list.innerHTML = '';
             w.lessons.forEach(l => {
                 const scored = currentUser && currentUser.quizScores && currentUser.quizScores[l.id];
+                const hasView = l.lessonCode && l.lessonCode.trim() !== '';
+                const hasPdf = l.pdf && l.pdf.trim() !== '' && l.pdf.trim() !== '#';
+                const hasQuiz = l.quiz && l.quiz.length > 0;
+                const buttons = [];
+                if (hasView) buttons.push(`<button onclick="viewLessonCode('${l.id}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer" title="Full-Screen Viewer"><i class="fa-solid fa-expand"></i> <span class="hidden xs:inline sm:inline">View</span></button>`);
+                if (hasPdf) buttons.push(`<button onclick="openLessonPdf('${l.id}')" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-indigo-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.pdfBtn}</button>`);
+                if (hasQuiz) buttons.push(`<button onclick="openQuizModal('${l.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.quizBtn}${scored ? ` ✓${scored.correct}/${scored.total}` : ''}</button>`);
+                const buttonsHtml = buttons.length > 0
+                    ? `<div class="grid gap-2 shrink-0" style="grid-template-columns: repeat(${buttons.length}, minmax(0, 1fr));">${buttons.join('')}</div>`
+                    : `<span class="text-[10px] text-slate-500 italic shrink-0">${currentLang === 'si' ? 'Content එකක් තවම ඇතුළත් කර නොමැත' : 'No content added yet'}</span>`;
                 list.innerHTML += `
                     <div class="bg-[#0f0c1a] border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-inner">
                         <span class="text-xs font-bold text-white sm:line-clamp-1 sm:flex-1 sm:min-w-0">${escapeHtml(l.title)}</span>
-                        <div class="grid grid-cols-3 sm:flex gap-2 shrink-0">
-                            <button onclick="viewLessonCode('${l.id}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer" title="Full-Screen Viewer"><i class="fa-solid fa-expand"></i> <span class="hidden xs:inline sm:inline">View</span></button>
-                            <button onclick="openLessonPdf('${l.id}')" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-indigo-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.pdfBtn}</button>
-                            <button onclick="openQuizModal('${l.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.quizBtn}${scored ? ` ✓${scored.correct}/${scored.total}` : ''}</button>
-                        </div>
+                        ${buttonsHtml}
                     </div>
                 `;
             });
