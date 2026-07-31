@@ -2115,7 +2115,11 @@
                                 <select id="quiz-target-lesson" onchange="renderQuizQuestionsList()" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white mt-1 focus:border-indigo-500 focus:outline-none transition"></select>
                             </div>
                         </div>
-                        <div class="space-y-2.5">
+                        <div class="flex gap-2 bg-[#0a0812] p-1 rounded-xl border border-slate-800 w-fit">
+                            <button id="quiz-mode-manual-btn" onclick="setQuizBuilderMode('manual')" class="text-[11px] font-bold px-4 py-2 rounded-lg transition bg-indigo-600 text-white">✍️ Manual</button>
+                            <button id="quiz-mode-bulk-btn" onclick="setQuizBuilderMode('bulk')" class="text-[11px] font-bold px-4 py-2 rounded-lg transition text-slate-400 hover:text-white">📋 Paste / Import</button>
+                        </div>
+                        <div id="quiz-mode-manual" class="space-y-2.5">
                             <input type="text" id="quiz-q-text" placeholder="ප්‍රශ්නය (Question)" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <input type="text" id="quiz-opt-0" placeholder="Option A" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-white focus:border-indigo-500 focus:outline-none transition">
@@ -2133,6 +2137,29 @@
                                 </select>
                             </div>
                             <button onclick="addQuizQuestion()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer shadow-lg">ප්‍රශ්නය එකතු කරන්න (Add Question)</button>
+                        </div>
+                        <div id="quiz-mode-bulk" class="hidden space-y-2.5">
+                            <div class="bg-[#161224] border border-slate-800 rounded-xl p-3 text-[10px] text-slate-400 leading-relaxed">
+                                Paste plain text or HTML (from Word/Google Docs/anywhere) — one question per block, options as A) B) C) D), and mark the correct one either with <b class="text-slate-200">Answer: B</b> on its own line, or a <b class="text-slate-200">*</b> right before the correct option. Example:
+                                <pre class="mt-1.5 bg-[#0a0812] rounded-lg p-2 text-[10px] text-indigo-300 whitespace-pre-wrap">1. 2x + 4 = 10 නම් x = ?
+A) 1
+B) 2
+*C) 3
+D) 4
+
+2. 3 හි වර්ගය කුමක්ද?
+A) 6
+B) 9
+C) 12
+D) 3
+Answer: B</pre>
+                            </div>
+                            <textarea id="quiz-bulk-text" rows="10" placeholder="Paste your questions here (text or HTML)..." class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition font-mono"></textarea>
+                            <div id="quiz-bulk-preview" class="hidden bg-[#161224] border border-slate-800 rounded-xl p-3 space-y-1.5 max-h-56 overflow-y-auto"></div>
+                            <div class="flex gap-2">
+                                <button onclick="previewBulkQuizImport()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer">👁️ Preview</button>
+                                <button onclick="confirmBulkQuizImport()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer shadow-lg">Import All Questions</button>
+                            </div>
                         </div>
                         <div id="quiz-questions-list" class="space-y-2 pt-2"></div>
                     </div>
@@ -5278,7 +5305,7 @@
             const t = translations[currentLang];
             weeksData.forEach((w, idx) => {
                 const isLocked = w.isLocked;
-                const thumbHtml = `<div class="relative h-28 shrink-0 bg-gradient-to-br from-indigo-600/20 to-purple-600/10 flex items-center justify-center text-indigo-500/40 text-2xl overflow-hidden">
+                const thumbHtml = `<div class="relative aspect-video shrink-0 bg-gradient-to-br from-indigo-600/20 to-purple-600/10 flex items-center justify-center text-indigo-500/40 text-2xl overflow-hidden">
                         <i class="fa-solid fa-image"></i>
                         ${w.thumbnail ? `<img src="${escapeHtml(w.thumbnail)}" alt="" loading="lazy" class="absolute inset-0 w-full h-full object-cover" onerror="this.style.display='none'">` : ''}
                         <div class="absolute top-2 left-2 right-2 z-10 flex justify-between items-center">
@@ -7265,6 +7292,97 @@
             const lessons = weeksData[weekIdx] ? weeksData[weekIdx].lessons : [];
             select.innerHTML = lessons.map(l => `<option value="${l.id}">${escapeHtml(l.title)}</option>`).join('') || '<option value="">No lessons in this week</option>';
             renderQuizQuestionsList();
+        }
+
+        function setQuizBuilderMode(mode) {
+            document.getElementById('quiz-mode-manual').classList.toggle('hidden', mode !== 'manual');
+            document.getElementById('quiz-mode-bulk').classList.toggle('hidden', mode !== 'bulk');
+            document.getElementById('quiz-mode-manual-btn').classList.toggle('bg-indigo-600', mode === 'manual');
+            document.getElementById('quiz-mode-manual-btn').classList.toggle('text-white', mode === 'manual');
+            document.getElementById('quiz-mode-manual-btn').classList.toggle('text-slate-400', mode !== 'manual');
+            document.getElementById('quiz-mode-bulk-btn').classList.toggle('bg-indigo-600', mode === 'bulk');
+            document.getElementById('quiz-mode-bulk-btn').classList.toggle('text-white', mode === 'bulk');
+            document.getElementById('quiz-mode-bulk-btn').classList.toggle('text-slate-400', mode !== 'bulk');
+        }
+
+        /* Parses pasted text OR raw HTML (Word/Docs/anywhere) into quiz questions.
+           Strips tags first (so HTML paste "just works"), then reads simple blocks:
+             1. Question text?
+             A) option
+             B) option
+             *C) option      <- "*" marks the correct one
+             D) option
+             Answer: C        <- or an explicit "Answer:" line instead of "*" */
+        function parseBulkQuizText(raw) {
+            let text = raw;
+            if (/<[a-z][\s\S]*>/i.test(raw)) {
+                const tmp = document.createElement('div');
+                tmp.innerHTML = raw.replace(/<\/(p|div|li|br|h[1-6])>/gi, '</$1>\n').replace(/<li[^>]*>/gi, '\n');
+                text = tmp.innerText || tmp.textContent || '';
+            }
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length);
+            const questions = [];
+            let cur = null;
+            const optionRe = /^\*?\s*\(?([A-Da-d])[\)\.:]\s*(.+)$/;
+            const answerRe = /^(answer|correct)\s*[:\-]?\s*\(?([A-Da-d])\)?\.?$/i;
+            for (let raw2 of lines) {
+                const ansM = raw2.match(answerRe);
+                const optM = raw2.match(optionRe);
+                if (ansM && cur) {
+                    cur.correct = ansM[2].toUpperCase().charCodeAt(0) - 65;
+                } else if (optM && cur && cur.options.length < 4) {
+                    cur.options.push(optM[2].trim());
+                    if (raw2.trim().startsWith('*')) cur.correct = cur.options.length - 1;
+                } else {
+                    // starts a new question — strip a leading "1." / "Q1." style number
+                    if (cur && cur.q && cur.options.length >= 2) questions.push(cur);
+                    cur = { q: raw2.replace(/^(q\s*)?\d+[\.\)]\s*/i, '').trim(), options: [], correct: 0 };
+                }
+            }
+            if (cur && cur.q && cur.options.length >= 2) questions.push(cur);
+            // pad to exactly 4 options (rare case of a 2-3 option question) and clamp correct index
+            questions.forEach(q => {
+                while (q.options.length < 4) q.options.push('');
+                q.options = q.options.slice(0, 4);
+                if (q.correct == null || q.correct < 0 || q.correct > 3) q.correct = 0;
+            });
+            return questions;
+        }
+
+        function previewBulkQuizImport() {
+            const raw = document.getElementById('quiz-bulk-text').value;
+            const parsed = parseBulkQuizText(raw);
+            const box = document.getElementById('quiz-bulk-preview');
+            box.classList.remove('hidden');
+            if (!parsed.length) {
+                box.innerHTML = `<p class="text-[10px] text-rose-400">No questions could be parsed — check the format against the example above.</p>`;
+                return;
+            }
+            box.innerHTML = parsed.map((q, i) => `
+                <div class="text-[10px] border-b border-slate-800 pb-1.5 last:border-0">
+                    <p class="text-slate-200 font-bold">${i + 1}. ${escapeHtml(q.q)}</p>
+                    <p class="text-slate-400">${q.options.map((o, oi) => `${String.fromCharCode(65 + oi)}) ${escapeHtml(o)}${oi === q.correct ? ' ✅' : ''}`).join(' &nbsp; ')}</p>
+                </div>
+            `).join('') + `<p class="text-[10px] text-emerald-400 font-bold pt-1">${parsed.length} question(s) found — check the ✅ marks match the correct answers, then click "Import All Questions".</p>`;
+        }
+
+        function confirmBulkQuizImport() {
+            const lessonId = document.getElementById('quiz-target-lesson').value;
+            const lesson = findLesson(lessonId);
+            if (!lesson) { showToast("Add a lesson to this week first", 'error'); return; }
+            const raw = document.getElementById('quiz-bulk-text').value;
+            const parsed = parseBulkQuizText(raw);
+            if (!parsed.length) { showToast("No questions could be parsed from that text", 'error'); return; }
+            const incomplete = parsed.filter(q => q.options.some(o => !o));
+            if (incomplete.length) { showToast(`${incomplete.length} question(s) are missing an option (need all 4) — fix and re-paste`, 'error'); return; }
+            parsed.forEach(q => lesson.quiz.push(q));
+            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            cloudPush();
+            document.getElementById('quiz-bulk-text').value = '';
+            document.getElementById('quiz-bulk-preview').classList.add('hidden');
+            renderQuizQuestionsList();
+            renderAdminWeeksManager();
+            showToast(`${parsed.length} question(s) imported`, 'success');
         }
 
         function addQuizQuestion() {
