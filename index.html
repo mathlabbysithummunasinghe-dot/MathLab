@@ -12,6 +12,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MathLab">
+    <!-- Preconnect: starts DNS+TLS handshake for these CDNs immediately instead of
+         waiting until each resource tag is reached, shaving time off first paint. -->
+    <link rel="preconnect" href="https://cdn.tailwindcss.com">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -37,18 +45,20 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- EmailJS CDN -->
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <!-- Chart.js, EmailJS, Firebase — deferred: they download in parallel with page
+         parsing instead of blocking it, then run in this order right before
+         DOMContentLoaded. Safe here because the app's own code only starts doing real
+         work later, from window.onload (see bootstrapApp). -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js" defer></script>
     <!-- Firebase (Firestore) — used to sync app data (users, weeks, notifications, zoom, site assets)
          across devices/browsers, since localStorage alone is per-device only. -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-    <!-- Desmos Graphing Calculator (free embeddable API) — used by the in-app
-         "Graphing Calculator" tool so students can plot algebra/geometry graphs. -->
-    <script src="https://www.desmos.com/api/v1.11/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js" defer></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js" defer></script>
+    <!-- Desmos Graphing Calculator: loaded lazily (see openCalculator()) instead of here,
+         so users who never open the calculator don't pay for a large blocking script on
+         every page load. -->
     <style>
         body { font-family: 'Plus Jakarta Sans', 'Inter', sans-serif; }
         ::-webkit-scrollbar { width: 8px; }
@@ -88,6 +98,59 @@
         .toast-leave { animation: toastOut 0.2s ease-in forwards; }
         @keyframes popIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
         .pop-in { animation: popIn 0.18s ease-out forwards; }
+
+        /* ===== Playful micro-interactions (dashboard mascot, XP, badges, buttons) ===== */
+        @keyframes wiggleHi {
+            0%, 100% { transform: rotate(0deg) scale(1); }
+            15% { transform: rotate(-9deg) scale(1.04); }
+            30% { transform: rotate(8deg) scale(1.04); }
+            45% { transform: rotate(-6deg) scale(1.02); }
+            60% { transform: rotate(4deg) scale(1.02); }
+            75% { transform: rotate(-2deg) scale(1.01); }
+        }
+        .wiggle-hi { animation: wiggleHi 0.7s ease-in-out; }
+
+        @keyframes badgeBounceIn {
+            0% { opacity: 0; transform: scale(0.3) rotate(-12deg); }
+            55% { opacity: 1; transform: scale(1.15) rotate(4deg); }
+            75% { transform: scale(0.94) rotate(-2deg); }
+            100% { opacity: 1; transform: scale(1) rotate(0deg); }
+        }
+        .badge-bounce-in { animation: badgeBounceIn 0.55s cubic-bezier(.34,1.56,.64,1) both; }
+
+        @keyframes sparklePop {
+            0% { opacity: 0; transform: translate(-50%,-50%) scale(0) rotate(0deg); }
+            35% { opacity: 1; }
+            100% { opacity: 0; transform: translate(-50%,-50%) scale(1.6) rotate(80deg) translateY(var(--sp-y, -18px)); }
+        }
+        .sparkle-particle {
+            position: absolute; top: 50%; left: 50%; pointer-events: none;
+            animation: sparklePop 0.75s ease-out forwards;
+        }
+
+        @keyframes countPulse {
+            0% { transform: scale(1); }
+            40% { transform: scale(1.22); }
+            100% { transform: scale(1); }
+        }
+        .count-pulse { animation: countPulse 0.4s ease-out; }
+
+        /* Ripple: a growing translucent circle from the click point on any .ripple-btn */
+        .ripple-btn { position: relative; overflow: hidden; }
+        .ripple-span {
+            position: absolute; border-radius: 9999px; background: rgba(255,255,255,0.45);
+            transform: scale(0); animation: rippleGrow 0.6s ease-out forwards; pointer-events: none;
+        }
+        @keyframes rippleGrow { to { transform: scale(2.6); opacity: 0; } }
+
+        /* Mouse-tilt cards: JS sets --tiltX/--tiltY, CSS applies the 3D transform */
+        .tilt-card {
+            --tiltX: 0deg; --tiltY: 0deg;
+            transform: perspective(700px) rotateX(var(--tiltX)) rotateY(var(--tiltY));
+            transition: transform 0.15s ease-out;
+            will-change: transform;
+        }
+        .tilt-card.tilt-reset { transition: transform 0.4s cubic-bezier(.22,1,.36,1); }
         #recorded-class-watermark { transition: top 2.5s ease-in-out, left 2.5s ease-in-out; }
         .quiz-option { transition: all 0.15s ease; }
         .quiz-option:hover { transform: translateX(2px); }
@@ -335,28 +398,46 @@
 
         /* ============ GRAPHING CALCULATOR (Desmos API) ============ */
         let desmosCalculatorInstance = null;
+        let desmosLoadPromise = null;
+
+        // Loads the Desmos script on first use only (not on every page load) — this is
+        // a fairly large third-party script, and most sessions never open the calculator.
+        function loadDesmosScript() {
+            if (typeof Desmos !== 'undefined') return Promise.resolve();
+            if (desmosLoadPromise) return desmosLoadPromise;
+            desmosLoadPromise = new Promise((resolve, reject) => {
+                const tag = document.createElement('script');
+                tag.src = 'https://www.desmos.com/api/v1.11/calculator.js?apiKey=dcb31709b452b1cf9dc26972add0fda6';
+                tag.onload = resolve;
+                tag.onerror = reject;
+                document.head.appendChild(tag);
+            });
+            return desmosLoadPromise;
+        }
+
         function openCalculator() {
             document.getElementById('calculator-modal').classList.remove('hidden');
             document.body.style.overflow = 'hidden';
-            if (typeof Desmos === 'undefined') {
-                document.getElementById('desmos-calculator-container').innerHTML =
-                    `<div class="h-full flex items-center justify-center text-center text-slate-500 text-xs p-6">${currentLang === 'si' ? 'Calculator එක load වීමට අන්තර්ජාල සම්බන්ධතාවයක් අවශ්‍යයි.' : 'An internet connection is needed to load the calculator.'}</div>`;
+            const container = document.getElementById('desmos-calculator-container');
+            if (desmosCalculatorInstance) {
+                // Desmos sizes itself off the container's on-screen dimensions, which
+                // are zero while the modal is hidden — force a resize now that it's visible.
+                desmosCalculatorInstance.resize();
                 return;
             }
-            if (!desmosCalculatorInstance) {
-                const elt = document.getElementById('desmos-calculator-container');
-                desmosCalculatorInstance = Desmos.GraphingCalculator(elt, {
+            container.innerHTML = `<div class="h-full flex items-center justify-center text-center text-slate-500 text-xs p-6"><i class="fa-solid fa-spinner fa-spin mr-2"></i> ${currentLang === 'si' ? 'Calculator එක load වෙමින්...' : 'Loading calculator...'}</div>`;
+            loadDesmosScript().then(() => {
+                container.innerHTML = '';
+                desmosCalculatorInstance = Desmos.GraphingCalculator(container, {
                     keypad: true,
                     expressions: true,
                     settingsMenu: true,
                     zoomButtons: true,
                     border: false
                 });
-            } else {
-                // Desmos sizes itself off the container's on-screen dimensions, which
-                // are zero while the modal is hidden — force a resize now that it's visible.
-                desmosCalculatorInstance.resize();
-            }
+            }).catch(() => {
+                container.innerHTML = `<div class="h-full flex items-center justify-center text-center text-slate-500 text-xs p-6">${currentLang === 'si' ? 'Calculator එක load වීමට අන්තර්ජාල සම්බන්ධතාවයක් අවශ්‍යයි.' : 'An internet connection is needed to load the calculator.'}</div>`;
+            });
         }
         function closeCalculator() {
             document.getElementById('calculator-modal').classList.add('hidden');
@@ -2671,6 +2752,55 @@
         const R2_WORKER_URL = "https://mathlab-uploads-worker.mathlabbysithummunasinghe.workers.dev";
         const R2_UPLOAD_SECRET = "MathLab2026SecureUpload!xk9";
 
+        /* ============ OTP — Cloudflare Worker (server-side verification) ============
+           Previously the OTP code itself was generated AND checked in the browser
+           (tempRegData.otp / tempResetData.otp), so anyone could open DevTools console
+           on their own session and read it out — no email access needed. This Worker
+           generates the code, emails it, and is the only thing that ever compares it;
+           the browser only ever gets back true/false. See otp-worker/OTP_SETUP.md for
+           how to deploy it. Until the two values below are filled in, the site falls
+           back to the old client-side flow automatically (same pattern as R2 above). */
+        const OTP_WORKER_URL = "PASTE_YOUR_OTP_WORKER_URL_HERE";
+        const OTP_WORKER_SECRET = "PASTE_YOUR_OTP_WORKER_SECRET_HERE";
+        const otpServerReady = !OTP_WORKER_URL.includes('PASTE_YOUR') && !OTP_WORKER_SECRET.includes('PASTE_YOUR');
+        if (!otpServerReady) {
+            console.warn('OTP Worker not configured — OTP verification is happening client-side, which is NOT secure (see otp-worker/OTP_SETUP.md). Fine for local testing, not for a real deployment.');
+        }
+
+        /* Asks the Worker to generate + email a fresh OTP for this address.
+           Resolves with {ok:true} or rejects with an Error carrying a user-facing message. */
+        async function requestOtpFromServer(email, name) {
+            const res = await fetch(`${OTP_WORKER_URL}/request-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-OTP-Secret': OTP_WORKER_SECRET },
+                body: JSON.stringify({ email, name })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.ok) {
+                if (data.error === 'cooldown') {
+                    throw new Error(currentLang === 'si'
+                        ? `මදක් ඉන්න — තත්පර ${data.retryAfter || 30}කින් නැවත try කරන්න.`
+                        : `Please wait a moment — try again in ${data.retryAfter || 30}s.`);
+                }
+                throw new Error(getOtpFailureMessage({ text: data.detail || data.error }));
+            }
+            return data;
+        }
+
+        /* Asks the Worker whether `code` is the current valid OTP for `email`.
+           Resolves with {ok:boolean, error?}. Never throws for a wrong/expired code —
+           only for a genuine network/server failure. */
+        async function verifyOtpWithServer(email, code) {
+            const res = await fetch(`${OTP_WORKER_URL}/verify-otp`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-OTP-Secret': OTP_WORKER_SECRET },
+                body: JSON.stringify({ email, code })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error('OTP verification request failed');
+            return data;
+        }
+
         function initFirebaseSync() {
             try {
                 if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes('YOUR_')) {
@@ -2879,8 +3009,103 @@
         /* One-time fetch of the latest cloud data before the app first renders, so the
            very first paint already reflects what other devices have saved — then hands
            off to initApp(). Falls back to whatever is in localStorage if offline/slow. */
+        /* ============ PLAYFUL MICRO-INTERACTIONS ============
+           Small delight touches for the (largely school-age) audience: a ripple under
+           every button tap, a gentle 3D tilt on dashboard/card hover, an idle wiggle on
+           the student avatar to draw the eye, XP numbers that "pop" when they change,
+           and a little sparkle burst the moment a badge is earned. None of this affects
+           app logic — purely visual, and cheap to remove by deleting this block. */
+
+        function setupRippleEffect() {
+            document.addEventListener('click', (e) => {
+                const btn = e.target.closest('button, .shine-btn, .ripple-btn');
+                if (!btn) return;
+                if (btn.disabled) return;
+                btn.classList.add('ripple-btn');
+                const rect = btn.getBoundingClientRect();
+                const size = Math.max(rect.width, rect.height);
+                const span = document.createElement('span');
+                span.className = 'ripple-span';
+                span.style.width = span.style.height = size + 'px';
+                span.style.left = (e.clientX - rect.left - size / 2) + 'px';
+                span.style.top = (e.clientY - rect.top - size / 2) + 'px';
+                btn.appendChild(span);
+                setTimeout(() => span.remove(), 650);
+            }, { passive: true });
+        }
+
+        function setupTiltEffect() {
+            let activeCard = null;
+            document.addEventListener('mousemove', (e) => {
+                const card = e.target.closest('.lift-card, .tilt-card');
+                if (card !== activeCard) {
+                    if (activeCard) resetTilt(activeCard);
+                    activeCard = card;
+                }
+                if (!card) return;
+                card.classList.add('tilt-card');
+                card.classList.remove('tilt-reset');
+                const rect = card.getBoundingClientRect();
+                const px = (e.clientX - rect.left) / rect.width;   // 0..1
+                const py = (e.clientY - rect.top) / rect.height;   // 0..1
+                const maxTilt = 4; // degrees — kept subtle so it feels smooth, not gimmicky
+                card.style.setProperty('--tiltY', `${(px - 0.5) * maxTilt * 2}deg`);
+                card.style.setProperty('--tiltX', `${(0.5 - py) * maxTilt * 2}deg`);
+            }, { passive: true });
+            document.addEventListener('mouseleave', () => { if (activeCard) { resetTilt(activeCard); activeCard = null; } }, true);
+            function resetTilt(card) {
+                card.classList.add('tilt-reset');
+                card.style.setProperty('--tiltX', '0deg');
+                card.style.setProperty('--tiltY', '0deg');
+            }
+        }
+
+        function setupAvatarWiggle() {
+            setInterval(() => {
+                const avatar = document.getElementById('student-avatar');
+                if (!avatar || document.hidden) return;
+                avatar.classList.remove('wiggle-hi');
+                void avatar.offsetWidth; // restart animation
+                avatar.classList.add('wiggle-hi');
+            }, 9000);
+        }
+
+        /* Call after any change to currentUser.xp/level text so the number "pops". */
+        function popNumberChange(el) {
+            if (!el) return;
+            el.classList.remove('count-pulse');
+            void el.offsetWidth;
+            el.classList.add('count-pulse');
+        }
+
+        /* Small burst of ✨ around a freshly-earned badge element. */
+        function sparkleBurst(targetEl) {
+            if (!targetEl) return;
+            targetEl.style.position = targetEl.style.position || 'relative';
+            const glyphs = ['✨', '⭐', '🌟'];
+            for (let i = 0; i < 5; i++) {
+                const s = document.createElement('span');
+                s.textContent = glyphs[i % glyphs.length];
+                s.className = 'sparkle-particle';
+                s.style.setProperty('--sp-y', `${-14 - Math.random() * 16}px`);
+                s.style.left = `${20 + Math.random() * 60}%`;
+                s.style.fontSize = `${10 + Math.random() * 6}px`;
+                s.style.animationDelay = `${i * 40}ms`;
+                targetEl.appendChild(s);
+                setTimeout(() => s.remove(), 900);
+            }
+        }
+
         function bootstrapApp() {
             startLiveClock();
+            setupRippleEffect();
+            setupTiltEffect();
+            setupAvatarWiggle();
+            // EmailJS now loads as a deferred script (for faster initial page load), so it
+            // may not have been ready yet when the early `if (window.emailjs)` init check
+            // ran near the top of this script. window.onload guarantees every deferred
+            // script has finished by now, so this call is safe and will actually take effect.
+            if (window.emailjs) { emailjs.init({ publicKey: EMAILJS_PUBLIC_KEY }); }
             const navTag = document.getElementById('nav-version-tag');
             if (navTag) navTag.textContent = 'v' + APP_VERSION;
             const sidebarTag = document.getElementById('sidebar-version-tag');
@@ -3090,10 +3315,17 @@
                 return;
             }
 
-            const otpCode = generateOtpCode();
-            tempResetData = { email: found.email, username: found.username, otp: otpCode };
+            tempResetData = { email: found.email, username: found.username, otpAttempts: 0 };
+            const resetSendPromise = otpServerReady
+                ? requestOtpFromServer(found.email, toTitleCase(found.fullname))
+                : (() => {
+                    const otpCode = generateOtpCode();
+                    tempResetData.otp = otpCode;
+                    tempResetData.otpExpiresAt = Date.now() + 10 * 60 * 1000;
+                    return sendOtpEmail(found.email, toTitleCase(found.fullname), otpCode);
+                })();
 
-            sendOtpEmail(found.email, toTitleCase(found.fullname), otpCode)
+            resetSendPromise
                 .then(() => {
                     document.getElementById('fp-step-email').classList.add('hidden');
                     document.getElementById('fp-step-reset').classList.remove('hidden');
@@ -3102,7 +3334,7 @@
                 .catch(err => {
                     console.error('Password reset OTP error:', err);
                     tempResetData = null;
-                    showToast(getOtpFailureMessage(err), 'error');
+                    showToast(err && err.message ? err.message : getOtpFailureMessage(err), 'error');
                 })
                 .finally(() => {
                     formBusy = false;
@@ -3114,21 +3346,63 @@
 
         function resendForgotPasswordOtp() {
             if (!tempResetData) { openForgotPasswordModal(); return; }
-            const otpCode = generateOtpCode();
-            tempResetData.otp = otpCode;
             const found = users.find(u => u.username === tempResetData.username);
-            sendOtpEmail(tempResetData.email, found ? toTitleCase(found.fullname) : tempResetData.username, otpCode)
+            const name = found ? toTitleCase(found.fullname) : tempResetData.username;
+            const resendPromise = otpServerReady
+                ? requestOtpFromServer(tempResetData.email, name)
+                : (() => {
+                    const otpCode = generateOtpCode();
+                    tempResetData.otp = otpCode;
+                    tempResetData.otpExpiresAt = Date.now() + 10 * 60 * 1000;
+                    tempResetData.otpAttempts = 0;
+                    return sendOtpEmail(tempResetData.email, name, otpCode);
+                })();
+            resendPromise
                 .then(() => showToast(currentLang === 'si' ? "OTP එක නැවත එවා ඇත!" : "OTP resent!", 'success'))
-                .catch(err => showToast(getOtpFailureMessage(err), 'error'));
+                .catch(err => showToast(err && err.message ? err.message : getOtpFailureMessage(err), 'error'));
         }
 
         async function confirmPasswordReset() {
             if (!tempResetData) { showToast("Session expired — please start again.", 'error'); openForgotPasswordModal(); return; }
             const enteredOtp = document.getElementById('fp-otp-input').value.trim();
             const newPass = document.getElementById('fp-newpass-input').value;
-            if (enteredOtp !== tempResetData.otp) {
-                showToast(currentLang === 'si' ? "වැරදි OTP අංකයකි!" : "Invalid OTP!", 'error');
-                return;
+
+            if (otpServerReady) {
+                let result;
+                try {
+                    result = await verifyOtpWithServer(tempResetData.email, enteredOtp);
+                } catch (err) {
+                    showToast(currentLang === 'si' ? "සත්‍යාපනය අසාර්ථකයි — නැවත උත්සාහ කරන්න." : "Verification failed — please try again.", 'error');
+                    return;
+                }
+                if (!result.ok) {
+                    if (result.error === 'expired' || result.error === 'too_many_attempts') {
+                        tempResetData = null;
+                        showToast(currentLang === 'si' ? "OTP කාලය ඉකුත් වුනා හෝ උත්සාහ ඉක්මවා ඇත. නැවත උත්සාහ කරන්න." : "OTP expired or too many attempts. Please start again.", 'error');
+                        openForgotPasswordModal();
+                        return;
+                    }
+                    showToast(currentLang === 'si' ? "වැරදි OTP අංකයකි!" : "Invalid OTP!", 'error');
+                    return;
+                }
+            } else {
+                if (tempResetData.otpExpiresAt && Date.now() > tempResetData.otpExpiresAt) {
+                    tempResetData = null;
+                    showToast(currentLang === 'si' ? "OTP කාලය ඉකුත් විය. නැවත උත්සාහ කරන්න." : "This OTP has expired. Please start again.", 'error');
+                    openForgotPasswordModal();
+                    return;
+                }
+                if (enteredOtp !== tempResetData.otp) {
+                    tempResetData.otpAttempts = (tempResetData.otpAttempts || 0) + 1;
+                    if (tempResetData.otpAttempts >= 5) {
+                        tempResetData = null;
+                        showToast(currentLang === 'si' ? "වැරදි උත්සාහ ගණන ඉක්මවා ඇත. නැවත උත්සාහ කරන්න." : "Too many incorrect attempts. Please start again.", 'error');
+                        openForgotPasswordModal();
+                        return;
+                    }
+                    showToast(currentLang === 'si' ? "වැරදි OTP අංකයකි!" : "Invalid OTP!", 'error');
+                    return;
+                }
             }
             if (!newPass || newPass.length < 6) {
                 showToast(currentLang === 'si' ? "Password අවම වශයෙන් අකුරු 6ක් වත් තිබිය යුතුයි" : "Password must be at least 6 characters", 'error');
@@ -4585,8 +4859,6 @@
             }
 
             tempRegData = { fullname, email, username, password, quizScores: {}, paidUntil: null, xp: 0, badges: [] };
-            const otpCode = generateOtpCode();
-            tempRegData.otp = otpCode;
 
             formBusy = true;
             const btn = document.getElementById('btn-reg-submit');
@@ -4595,14 +4867,28 @@
             btn.classList.add('opacity-60', 'cursor-not-allowed');
             btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1"></i> ${currentLang === 'si' ? 'OTP එවමින්...' : 'Sending OTP...'}`;
 
-            sendOtpEmail(email, fullname, otpCode)
+            // Server-side path: the Worker generates + emails the code and is the only
+            // thing that ever compares it, so tempRegData never holds the real code.
+            const sendPromise = otpServerReady
+                ? requestOtpFromServer(email, fullname)
+                : (() => {
+                    // Fallback (no Worker configured yet) — same as the old flow, kept
+                    // only so the site still works before OTP_WORKER_URL is set up.
+                    const otpCode = generateOtpCode();
+                    tempRegData.otp = otpCode;
+                    tempRegData.otpExpiresAt = Date.now() + 10 * 60 * 1000;
+                    tempRegData.otpAttempts = 0;
+                    return sendOtpEmail(email, fullname, otpCode);
+                })();
+
+            sendPromise
                 .then(() => {
                     openOtpModal(email, fullname);
                 })
                 .catch(err => {
-                    console.error('EmailJS send error:', err);
+                    console.error('OTP send error:', err);
                     tempRegData = null;
-                    showToast(getOtpFailureMessage(err), 'error');
+                    showToast(err && err.message ? err.message : getOtpFailureMessage(err), 'error');
                 })
                 .finally(() => {
                     formBusy = false;
@@ -4615,12 +4901,19 @@
         function resendOtp() {
             if (otpBusy) return;
             if (tempRegData) {
-                const otpCode = generateOtpCode();
-                tempRegData.otp = otpCode;
                 setOtpModalBusy(true, currentLang === 'si' ? 'නැවත එවමින්...' : 'Resending...', '');
-                sendOtpEmail(tempRegData.email, tempRegData.fullname, otpCode)
+                const resendPromise = otpServerReady
+                    ? requestOtpFromServer(tempRegData.email, tempRegData.fullname)
+                    : (() => {
+                        const otpCode = generateOtpCode();
+                        tempRegData.otp = otpCode;
+                        tempRegData.otpExpiresAt = Date.now() + 10 * 60 * 1000;
+                        tempRegData.otpAttempts = 0;
+                        return sendOtpEmail(tempRegData.email, tempRegData.fullname, otpCode);
+                    })();
+                resendPromise
                     .then(() => showToast(currentLang === 'si' ? "OTP නැවත එවන ලදී!" : "OTP resent!", 'success'))
-                    .catch(err => showToast(getOtpFailureMessage(err), 'error'))
+                    .catch(err => showToast(err && err.message ? err.message : getOtpFailureMessage(err), 'error'))
                     .finally(() => setOtpModalBusy(false, '', translations[currentLang].otpBtn));
             }
         }
@@ -4630,39 +4923,78 @@
             const enteredOtp = document.getElementById('otp-input').value.trim();
 
             if (!tempRegData) { closeOtpModal(); return; }
-            if (enteredOtp === tempRegData.otp) {
-                const { otp, password: rawPassword, ...userRecord } = tempRegData;
-                userRecord.studentId = generateStudentId();
-                if (firebaseReady) {
-                    try {
-                        await firebase.auth().createUserWithEmailAndPassword(userRecord.email, rawPassword);
-                    } catch (err) {
-                        console.warn('Firebase Auth account creation failed, falling back to local hash:', err);
-                        const { password, salt } = await hashNewPassword(rawPassword);
-                        userRecord.password = password;
-                        userRecord.salt = salt;
+
+            if (otpServerReady) {
+                setOtpModalBusy(true, currentLang === 'si' ? 'සත්‍යාපනය කරමින්...' : 'Verifying...', '');
+                let result;
+                try {
+                    result = await verifyOtpWithServer(tempRegData.email, enteredOtp);
+                } catch (err) {
+                    setOtpModalBusy(false, '', translations[currentLang].otpBtn);
+                    showToast(currentLang === 'si' ? "සත්‍යාපනය අසාර්ථකයි — නැවත උත්සාහ කරන්න." : "Verification failed — please try again.", 'error');
+                    return;
+                }
+                setOtpModalBusy(false, '', translations[currentLang].otpBtn);
+                if (!result.ok) {
+                    if (result.error === 'expired' || result.error === 'too_many_attempts') {
+                        tempRegData = null;
+                        showToast(currentLang === 'si' ? "OTP කාලය ඉකුත් වුනා හෝ උත්සාහ ඉක්මවා ඇත. නැවත register වන්න." : "OTP expired or too many attempts. Please register again.", 'error');
+                        closeOtpModal();
+                        return;
                     }
-                } else {
-                    // Offline — fall back to our own hash so registration still works;
-                    // this account migrates to real Firebase Auth on its first online login.
+                    showToast(currentLang === 'si' ? "වැරදි OTP අංකයකි!" : "Invalid OTP!", 'error');
+                    return;
+                }
+            } else {
+                // Fallback path (no Worker configured) — old client-side comparison.
+                if (tempRegData.otpExpiresAt && Date.now() > tempRegData.otpExpiresAt) {
+                    tempRegData = null;
+                    showToast(currentLang === 'si' ? "OTP කාලය ඉකුත් විය. නැවත register වන්න." : "This OTP has expired. Please register again.", 'error');
+                    closeOtpModal();
+                    return;
+                }
+                if (enteredOtp !== tempRegData.otp) {
+                    tempRegData.otpAttempts = (tempRegData.otpAttempts || 0) + 1;
+                    if (tempRegData.otpAttempts >= 5) {
+                        tempRegData = null;
+                        showToast(currentLang === 'si' ? "වැරදි උත්සාහ ගණන ඉක්මවා ඇත. නැවත register වන්න." : "Too many incorrect attempts. Please register again.", 'error');
+                        closeOtpModal();
+                        return;
+                    }
+                    showToast(currentLang === 'si' ? "වැරදි OTP අංකයකි!" : "Invalid OTP!", 'error');
+                    return;
+                }
+            }
+            // At this point the OTP has been verified (server-side, or client-side in the fallback).
+            const { otp, password: rawPassword, ...userRecord } = tempRegData;
+            userRecord.studentId = generateStudentId();
+            if (firebaseReady) {
+                try {
+                    await firebase.auth().createUserWithEmailAndPassword(userRecord.email, rawPassword);
+                } catch (err) {
+                    console.warn('Firebase Auth account creation failed, falling back to local hash:', err);
                     const { password, salt } = await hashNewPassword(rawPassword);
                     userRecord.password = password;
                     userRecord.salt = salt;
                 }
-                users.push(userRecord);
-                localStorage.setItem('moramaths_users', JSON.stringify(users));
-                cloudPush();
-                currentUser = userRecord;
-                users = sanitizeUsersArray(users, currentUser.username, isAdminUser(currentUser));
-                localStorage.setItem('moramaths_users', JSON.stringify(users));
-                localStorage.setItem('moramaths_current_user', JSON.stringify(currentUser));
-                closeOtpModal();
-                showToast(currentLang === 'si' ? "ලියාපදිංචිය සාර්ථකයි! 🎉" : "Registration Successful! 🎉", 'success');
-                fireConfetti(70);
-                initApp();
             } else {
-                showToast(currentLang === 'si' ? "වැරදි OTP අංකයකි!" : "Invalid OTP!", 'error');
+                // Offline — fall back to our own hash so registration still works;
+                // this account migrates to real Firebase Auth on its first online login.
+                const { password, salt } = await hashNewPassword(rawPassword);
+                userRecord.password = password;
+                userRecord.salt = salt;
             }
+            users.push(userRecord);
+            localStorage.setItem('moramaths_users', JSON.stringify(users));
+            cloudPush();
+            currentUser = userRecord;
+            users = sanitizeUsersArray(users, currentUser.username, isAdminUser(currentUser));
+            localStorage.setItem('moramaths_users', JSON.stringify(users));
+            localStorage.setItem('moramaths_current_user', JSON.stringify(currentUser));
+            closeOtpModal();
+            showToast(currentLang === 'si' ? "ලියාපදිංචිය සාර්ථකයි! 🎉" : "Registration Successful! 🎉", 'success');
+            fireConfetti(70);
+            initApp();
         }
 
         function logout() {
@@ -5692,11 +6024,12 @@
                 });
                 fireConfetti(40);
             }
-            renderGamification();
+            renderGamification(newlyEarned.map(b => b.id));
         }
 
-        function renderGamification() {
+        function renderGamification(newlyEarnedIds) {
             if (!currentUser) return;
+            newlyEarnedIds = newlyEarnedIds || [];
             const xp = currentUser.xp || 0;
             const level = xpLevel(xp);
             const xpIntoLevel = xp % 100;
@@ -5704,26 +6037,33 @@
             const levelLabelEl = document.getElementById('xp-level-label');
             const levelTextEl = document.getElementById('xp-level-text');
             const levelBarEl = document.getElementById('xp-level-bar');
+            const xpChanged = levelNumEl && levelNumEl.innerText !== String(level);
             if (levelNumEl) levelNumEl.innerText = level;
             if (levelLabelEl) levelLabelEl.innerText = `Level ${level}`;
             if (levelTextEl) levelTextEl.innerText = `${xpIntoLevel} / 100 XP`;
             if (levelBarEl) levelBarEl.style.width = xpIntoLevel + '%';
+            if (xpChanged) popNumberChange(levelNumEl);
 
             const grid = document.getElementById('badges-grid');
             if (grid) {
                 const earnedIds = (currentUser.badges || []).map(b => b.id);
                 grid.innerHTML = BADGES.map(b => {
                     const earned = earnedIds.includes(b.id);
+                    const isNew = newlyEarnedIds.includes(b.id);
                     const name = currentLang === 'si' ? b.si : b.en;
                     const desc = currentLang === 'si' ? b.descSi : b.descEn;
                     return `
-                        <div title="${escapeHtml(desc)}" class="flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border transition ${earned ? `bg-${b.color}-500/10 border-${b.color}-500/40` : 'bg-[#0f0c1a] border-slate-800 opacity-40'}">
+                        <div title="${escapeHtml(desc)}" data-badge-id="${b.id}" class="${isNew ? 'badge-bounce-in' : ''} flex flex-col items-center text-center gap-1.5 p-3 rounded-2xl border transition relative ${earned ? `bg-${b.color}-500/10 border-${b.color}-500/40` : 'bg-[#0f0c1a] border-slate-800 opacity-40'}">
                             <div class="w-10 h-10 rounded-xl flex items-center justify-center ${earned ? `bg-${b.color}-500/20 text-${b.color}-400` : 'bg-slate-800 text-slate-600'}">
                                 <i class="fa-solid ${b.icon}"></i>
                             </div>
                             <span class="text-[9px] font-bold leading-tight ${earned ? 'text-slate-200' : 'text-slate-600'}">${escapeHtml(name)}</span>
                         </div>`;
                 }).join('');
+                newlyEarnedIds.forEach(id => {
+                    const el = grid.querySelector(`[data-badge-id="${id}"]`);
+                    if (el) sparkleBurst(el);
+                });
             }
         }
 

@@ -1,0 +1,16 @@
+name = "mathlab-otp-worker"
+main = "otp-worker.js"
+compatibility_date = "2024-11-01"
+
+# After creating the KV namespace (see OTP_SETUP.md), paste its id below.
+kv_namespaces = [
+  { binding = "OTP_KV", id = "PASTE_YOUR_KV_NAMESPACE_ID" }
+]
+
+# Non-secret config can live here. Secrets (EMAILJS_PRIVATE_KEY, OTP_SHARED_SECRET)
+# are set separately with `wrangler secret put` — never put them in this file.
+[vars]
+EMAILJS_SERVICE_ID = "service_41iff0u"
+EMAILJS_TEMPLATE_ID = "template_rcx7b0q"
+EMAILJS_PUBLIC_KEY = "4RpakIA9teiYmsF6Q"
+ALLOWED_ORIGIN = "*"
