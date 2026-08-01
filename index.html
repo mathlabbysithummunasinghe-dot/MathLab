@@ -1268,7 +1268,7 @@
                     <i class="fa-solid fa-brain w-4 text-center text-purple-400"></i> <span id="txt-sidebar-focus">Focus Mode</span>
                     <span id="sidebar-focus-live-dot" class="hidden w-1.5 h-1.5 rounded-full bg-emerald-400 ml-auto animate-pulse"></span>
                 </div>
-                <div class="sidebar-link" id="sidebar-link-pastpapers" onclick="sidebarAction('pastpapers')"><i class="fa-solid fa-file-lines w-4 text-center text-sky-400"></i> <span id="txt-sidebar-pastpapers">Past Papers</span></div>
+                <div class="sidebar-link" id="sidebar-link-pastpapers" onclick="sidebarAction('pastpapers')"><i class="fa-solid fa-file-lines w-4 text-center text-sky-400"></i> <span id="txt-sidebar-pastpapers">Papers</span></div>
                 <div class="sidebar-link" id="sidebar-link-contact" onclick="sidebarAction('contact')">
                     <i class="fa-solid fa-headset w-4 text-center text-amber-400"></i> <span id="txt-sidebar-contact">Contact Us</span>
                     <span id="sidebar-contact-unread-badge" class="hidden ml-auto min-w-[16px] h-4 px-1 bg-rose-500 rounded-full text-[9px] font-bold flex items-center justify-center text-white">0</span>
@@ -1291,7 +1291,7 @@
                 <div class="sidebar-link admin-nav-link" data-section="announce" onclick="showAdminSection('announce')"><i class="fa-solid fa-bullhorn w-4 text-center text-purple-400"></i> <span>Announcements</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="graph" onclick="showAdminSection('graph')"><i class="fa-solid fa-chart-line w-4 text-center text-purple-400"></i> <span>Progress Graph</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="goals" onclick="showAdminSection('goals')"><i class="fa-solid fa-bullseye w-4 text-center text-purple-400"></i> <span>Goals</span></div>
-                <div class="sidebar-link admin-nav-link" data-section="pastpapers-admin" onclick="showAdminSection('pastpapers-admin')"><i class="fa-solid fa-file-lines w-4 text-center text-sky-400"></i> <span>Past Papers</span></div>
+                <div class="sidebar-link admin-nav-link" data-section="pastpapers-admin" onclick="showAdminSection('pastpapers-admin')"><i class="fa-solid fa-file-lines w-4 text-center text-sky-400"></i> <span>Papers</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="songs" onclick="showAdminSection('songs')"><i class="fa-brands fa-youtube w-4 text-center text-sky-400"></i> <span>Song Playlists</span></div>
                 <div class="sidebar-link admin-nav-link master-admin-only hidden" data-section="contact-settings" onclick="showAdminSection('contact-settings')"><i class="fa-solid fa-headset w-4 text-center text-amber-400"></i> <span>Contact Settings</span></div>
                 <div class="sidebar-link admin-nav-link master-admin-only hidden" data-section="appearance" onclick="showAdminSection('appearance')"><i class="fa-solid fa-image w-4 text-center text-amber-400"></i> <span>Site Appearance</span></div>
@@ -1629,7 +1629,10 @@
             <div class="bg-[#161224]/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4">
                     <h2 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-trophy text-yellow-400"></i> <span id="leaderboard-title">Quiz Leaderboard</span></h2>
-                    <button onclick="toggleLeaderboardView()" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition"><i class="fa-solid fa-arrow-left mr-1"></i> <span id="leaderboard-back">Back</span></button>
+                    <div class="flex items-center gap-2">
+                        <button id="leaderboard-clear-btn" onclick="clearLeaderboard()" class="hidden bg-rose-600/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition"><i class="fa-solid fa-trash mr-1"></i> <span id="leaderboard-clear-text">Clear Leaderboard</span></button>
+                        <button onclick="toggleLeaderboardView()" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition"><i class="fa-solid fa-arrow-left mr-1"></i> <span id="leaderboard-back">Back</span></button>
+                    </div>
                 </div>
                 <div id="leaderboard-list" class="space-y-2.5"></div>
                 <p id="leaderboard-empty" class="hidden text-center text-xs text-slate-500 py-8">No quiz attempts yet — be the first!</p>
@@ -1700,7 +1703,7 @@
         <div id="pastpapers-section" class="hidden w-full max-w-4xl space-y-6">
             <div class="bg-[#161224]/90 backdrop-blur-2xl border border-slate-800/80 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-5">
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4 gap-3">
-                    <h2 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-file-lines text-sky-400"></i> <span id="txt-pastpapers-title">Past Papers</span></h2>
+                    <h2 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-file-lines text-sky-400"></i> <span id="txt-pastpapers-title">Papers</span></h2>
                     <button onclick="togglePastPapersView()" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition"><i class="fa-solid fa-arrow-left mr-1"></i> Back</button>
                 </div>
                 <div id="pastpapers-list" class="space-y-4"></div>
@@ -1725,6 +1728,14 @@
                         <div class="text-left"><p class="text-xs font-black">Telegram</p><p class="text-[10px] opacity-70">Join our channel/chat</p></div>
                     </a>
                     <p id="contact-telegram-empty" class="hidden bg-[#0f0c1a] border border-dashed border-slate-700 text-slate-500 rounded-2xl px-4 py-4 text-[11px] flex items-center">Telegram not set up yet.</p>
+                    <a id="contact-whatsapp-group-link" href="#" target="_blank" class="hidden bg-emerald-600/15 hover:bg-emerald-600/25 border border-emerald-500/30 text-emerald-300 rounded-2xl px-4 py-4 flex items-center gap-3 transition">
+                        <i class="fa-brands fa-whatsapp text-2xl"></i>
+                        <div class="text-left"><p class="text-xs font-black">WhatsApp Group</p><p class="text-[10px] opacity-70">Join the class group</p></div>
+                    </a>
+                    <a id="contact-telegram-group-link" href="#" target="_blank" class="hidden bg-sky-600/15 hover:bg-sky-600/25 border border-sky-500/30 text-sky-300 rounded-2xl px-4 py-4 flex items-center gap-3 transition">
+                        <i class="fa-brands fa-telegram text-2xl"></i>
+                        <div class="text-left"><p class="text-xs font-black">Telegram Group</p><p class="text-[10px] opacity-70">Join the class group</p></div>
+                    </a>
                     <a id="contact-phone1-link" href="#" class="hidden bg-indigo-600/15 hover:bg-indigo-600/25 border border-indigo-500/30 text-indigo-300 rounded-2xl px-4 py-4 flex items-center gap-3 transition">
                         <i class="fa-solid fa-phone text-xl"></i>
                         <div class="text-left flex-1 min-w-0"><p class="text-xs font-black">Call Us</p><p id="contact-phone1-number" class="text-[10px] opacity-70 truncate"></p></div>
@@ -2023,6 +2034,14 @@
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Telegram Link</label>
                                 <input type="text" id="admin-contact-telegram" placeholder="https://t.me/yourchannel" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">WhatsApp Group Link</label>
+                                <input type="text" id="admin-contact-whatsapp-group" placeholder="https://chat.whatsapp.com/xxxxxxxx" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition">
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Telegram Group Link</label>
+                                <input type="text" id="admin-contact-telegram-group" placeholder="https://t.me/+xxxxxxxxxxxx" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition">
                             </div>
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Phone Number 1</label>
@@ -3823,7 +3842,7 @@ Answer: B</pre>
                 bulkAccessNote: "මෙයින් ලියාපදිංචි සියලුම සිසුන්ගේ access එකවර තෝරාගත් දිනය දක්වා සකසයි — පසුව එක් එක් සිසුවෙකුගේ access එක වෙන වෙනම වෙනස් කළ හැක.",
                 defaultPasswordWarning: "මෙම ගිණුම තවමත් default password එකම (\"123\") භාවිත කරයි. ආරක්ෂාව සඳහා දැන්ම එය වෙනස් කරන්න.",
                 defaultPasswordWarningBtn: "Password එක වෙනස් කරන්න",
-                chartLabel: "මෙගා ප්‍රශ්නාවලී ලකුණු (%)",
+                chartLabel: "ප්‍රශ්නාවලී ලකුණු (%)",
                 chartBoxTitle: "සතිපතා ලකුණු ප්‍රගතිය සහ විස්තරාත්මක විශ්ලේෂණය",
                 goalsTitle: "ඉලක්ක සහ ජයග්‍රහණ",
                 goalsSub: "ඔබේ O/L ගණිතය ඉහළම සාමාර්ථයක් සඳහා සූදානම් වීම.",
@@ -3898,7 +3917,7 @@ Answer: B</pre>
                 bulkAccessNote: "This sets every registered student's access to the chosen date at once — you can still fine-tune one student individually below afterwards.",
                 defaultPasswordWarning: "This account is still using the default password (\"123\"). Change it now to keep your admin panel secure.",
                 defaultPasswordWarningBtn: "Change Password",
-                chartLabel: "Mega Quiz Marks (%)",
+                chartLabel: "Quiz Marks (%)",
                 chartBoxTitle: "Weekly Marks Progress & Detailed Analysis",
                 goalsTitle: "Goals & Achievements",
                 goalsSub: "Preparing for top-grade O/L Mathematics success.",
@@ -4259,7 +4278,7 @@ Answer: B</pre>
         }
         let goalsData = JSON.parse(localStorage.getItem('moramaths_goals_data')) || { revisionMetric: 'quizzes', papersMetric: 'quizzes' };
         let pastPapersData = JSON.parse(localStorage.getItem('moramaths_pastpapers')) || [];
-        let contactData = JSON.parse(localStorage.getItem('moramaths_contact')) || { whatsapp: '', telegram: '', phone1: '', phone2: '' };
+        let contactData = JSON.parse(localStorage.getItem('moramaths_contact')) || { whatsapp: '', telegram: '', whatsappGroup: '', telegramGroup: '', phone1: '', phone2: '' };
         let studentMessages = JSON.parse(localStorage.getItem('moramaths_messages')) || {};
         let songPlaylists = JSON.parse(localStorage.getItem('moramaths_songplaylists')) || { english: [], sinhala: [], hindi: [] };
 
@@ -4372,8 +4391,8 @@ Answer: B</pre>
             document.getElementById('schedule-section-title').innerText = t.scheduleSectionTitle;
             document.getElementById('schedule-back').innerText = t.scheduleBack;
             document.getElementById('txt-sidebar-focus').innerText = t.sidebarFocus;
-            document.getElementById('txt-sidebar-pastpapers').innerText = currentLang === 'si' ? 'පසුගිය ප්‍රශ්න පත්‍ර' : 'Past Papers';
-            document.getElementById('txt-pastpapers-title').innerText = currentLang === 'si' ? 'පසුගිය ප්‍රශ්න පත්‍ර' : 'Past Papers';
+            document.getElementById('txt-sidebar-pastpapers').innerText = currentLang === 'si' ? 'ප්‍රශ්න පත්‍ර' : 'Papers';
+            document.getElementById('txt-pastpapers-title').innerText = currentLang === 'si' ? 'ප්‍රශ්න පත්‍ර' : 'Papers';
             document.getElementById('txt-sidebar-contact').innerText = currentLang === 'si' ? 'අප අමතන්න' : 'Contact Us';
             document.getElementById('txt-contact-title').innerText = currentLang === 'si' ? 'අප අමතන්න' : 'Contact Us';
             document.getElementById('txt-sidebar-account').innerText = t.sidebarAccount;
@@ -4410,7 +4429,7 @@ Answer: B</pre>
         }
 
         let users = JSON.parse(localStorage.getItem('moramaths_users')) || [
-            { fullname: "Master Admin", email: "mathlabbysithummunasinghe@gmail.com", username: "admin", password: "123", role: "master_admin", quizScores: {} },
+            { fullname: "Master Admin", email: "mathlabbysithummunasinghe@gmail.com", username: "adminmathlab", password: "123", role: "master_admin", quizScores: {} },
             { fullname: "Admin Two", email: "admin2@mathlab.lk", username: "admin2", password: "123", role: "admin", quizScores: {} },
             { fullname: "Admin Three", email: "admin3@mathlab.lk", username: "admin3", password: "123", role: "admin", quizScores: {} }
         ];
@@ -4458,11 +4477,21 @@ Answer: B</pre>
             });
             let assignedNewStudentIds = false;
             let adminEmailFixed = false;
+            let adminUsernameRenamed = false;
+            // One-time migration: sites that already have a live "admin" account
+            // (the old default username) get it renamed to "adminmathlab" so this
+            // works the same for existing deployments as it does for fresh installs.
+            const legacyAdmin = users.find(u => u.username === 'admin' && u.role === 'master_admin');
+            if (legacyAdmin && !users.some(u => u.username === 'adminmathlab')) {
+                legacyAdmin.username = 'adminmathlab';
+                adminUsernameRenamed = true;
+                if (currentUser && currentUser.username === 'admin') currentUser.username = 'adminmathlab';
+            }
             users.forEach(u => {
                 if (!u.quizScores) u.quizScores = {};
                 if (!u.gameProgress) u.gameProgress = { unlocked: 1, scores: {} };
-                if (!u.role) u.role = (u.username === 'admin') ? 'master_admin' : 'student';
-                if (u.username === 'admin' && u.role === 'master_admin' && u.email !== 'mathlabbysithummunasinghe@gmail.com') {
+                if (!u.role) u.role = (u.username === 'admin' || u.username === 'adminmathlab') ? 'master_admin' : 'student';
+                if ((u.username === 'admin' || u.username === 'adminmathlab') && u.role === 'master_admin' && u.email !== 'mathlabbysithummunasinghe@gmail.com') {
                     u.email = 'mathlabbysithummunasinghe@gmail.com';
                     adminEmailFixed = true;
                 }
@@ -4478,19 +4507,24 @@ Answer: B</pre>
             // backfills above — if we don't save this immediately, a fresh page load
             // would regenerate a *different* id next time (users gets fully replaced by
             // whatever the cloud last had). Persist right away so it sticks.
-            if (assignedNewStudentIds || adminEmailFixed) {
+            if (assignedNewStudentIds || adminEmailFixed || adminUsernameRenamed) {
                 localStorage.setItem('moramaths_users', JSON.stringify(users));
                 cloudPush();
             }
-            if (currentUser && currentUser.username === 'admin' && currentUser.email !== 'mathlabbysithummunasinghe@gmail.com') {
+            if (currentUser && (currentUser.username === 'admin' || currentUser.username === 'adminmathlab') && currentUser.email !== 'mathlabbysithummunasinghe@gmail.com') {
                 currentUser.email = 'mathlabbysithummunasinghe@gmail.com';
+                localStorage.setItem('moramaths_current_user', JSON.stringify(currentUser));
+            }
+            if (adminUsernameRenamed && currentUser) {
                 localStorage.setItem('moramaths_current_user', JSON.stringify(currentUser));
             }
             if (!Array.isArray(pastPapersData)) pastPapersData = [];
             if (!goalsData || typeof goalsData !== 'object') goalsData = { revisionMetric: 'quizzes', papersMetric: 'quizzes' };
             if (!goalsData.revisionMetric) goalsData.revisionMetric = 'quizzes';
             if (!goalsData.papersMetric) goalsData.papersMetric = 'quizzes';
-            if (!contactData || typeof contactData !== 'object') contactData = { whatsapp: '', telegram: '', phone1: '', phone2: '' };
+            if (!contactData || typeof contactData !== 'object') contactData = { whatsapp: '', telegram: '', whatsappGroup: '', telegramGroup: '', phone1: '', phone2: '' };
+            if (contactData.whatsappGroup === undefined) contactData.whatsappGroup = '';
+            if (contactData.telegramGroup === undefined) contactData.telegramGroup = '';
             if (contactData.phone1 === undefined) contactData.phone1 = '';
             if (contactData.phone2 === undefined) contactData.phone2 = '';
             if (!studentMessages || typeof studentMessages !== 'object') studentMessages = {};
@@ -4503,7 +4537,7 @@ Answer: B</pre>
             ['english', 'sinhala', 'hindi'].forEach(k => { if (!Array.isArray(songPlaylists[k])) songPlaylists[k] = []; });
             if (currentUser && !currentUser.quizScores) currentUser.quizScores = {};
             if (currentUser && !currentUser.gameProgress) currentUser.gameProgress = { unlocked: 1, scores: {} };
-            if (currentUser && !currentUser.role) currentUser.role = (currentUser.username === 'admin') ? 'master_admin' : 'student';
+            if (currentUser && !currentUser.role) currentUser.role = (currentUser.username === 'admin' || currentUser.username === 'adminmathlab') ? 'master_admin' : 'student';
             if (currentUser && !currentUser.streak) currentUser.streak = { count: 0, lastDate: '' };
             if (currentUser && currentUser.xp === undefined) currentUser.xp = 0;
             if (currentUser && !currentUser.badges) currentUser.badges = [];
@@ -5188,17 +5222,27 @@ Answer: B</pre>
             const points = [];
             weeksData.forEach((w, wi) => {
                 if (weekFilter !== null && wi !== weekFilter) return;
+                // Collect every scored quiz within this week, then plot ONE point per
+                // week that is the average of all of them — so as more quizzes get
+                // added to a week over time, the graph still shows a single, readable
+                // per-week trend line instead of one point per individual quiz.
+                let pctSum = 0, count = 0, lastDate = 0;
                 (w.lessons || []).forEach(l => {
                     const score = user.quizScores[l.id];
                     if (!score || !score.total) return;
-                    points.push({
-                        label: l.title.length > 14 ? l.title.slice(0, 13) + '…' : l.title,
-                        pct: Math.round((score.correct / score.total) * 100),
-                        date: score.date || 0
-                    });
+                    pctSum += (score.correct / score.total) * 100;
+                    count++;
+                    if ((score.date || 0) > lastDate) lastDate = score.date || 0;
+                });
+                if (count === 0) return;
+                points.push({
+                    label: `Week ${w.week}`,
+                    pct: Math.round(pctSum / count),
+                    date: lastDate,
+                    order: wi
                 });
             });
-            points.sort((a, b) => a.date - b.date);
+            points.sort((a, b) => a.order - b.order);
             return { labels: points.map(p => p.label), data: points.map(p => p.pct) };
         }
 
@@ -5352,9 +5396,10 @@ Answer: B</pre>
                 const buttons = [];
                 if (hasView) buttons.push(`<button onclick="viewLessonCode('${l.id}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer" title="Full-Screen Viewer"><i class="fa-solid fa-expand"></i> <span class="hidden xs:inline sm:inline">View</span></button>`);
                 if (hasPdf) buttons.push(`<button onclick="openLessonPdf('${l.id}')" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-indigo-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.pdfBtn}</button>`);
+                if (hasPdf) buttons.push(`<button onclick="downloadLessonPdf('${l.id}')" title="${currentLang === 'si' ? 'PDF එක Download කරන්න' : 'Download PDF'}" class="bg-slate-800/60 hover:bg-indigo-600 text-slate-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-slate-700 transition flex items-center justify-center cursor-pointer"><i class="fa-solid fa-download"></i></button>`);
                 if (hasQuiz) buttons.push(`<button onclick="openQuizModal('${l.id}')" class="bg-emerald-600/20 hover:bg-emerald-600 text-emerald-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-emerald-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.quizBtn}${scored ? ` ✓${scored.correct}/${scored.total}` : ''}</button>`);
                 const buttonsHtml = buttons.length > 0
-                    ? `<div class="grid gap-2 shrink-0" style="grid-template-columns: repeat(${buttons.length}, minmax(0, 1fr));">${buttons.join('')}</div>`
+                    ? `<div class="flex flex-wrap items-center justify-end gap-2 shrink-0">${buttons.join('')}</div>`
                     : `<span class="text-[10px] text-slate-500 italic shrink-0">${currentLang === 'si' ? 'Content එකක් තවම ඇතුළත් කර නොමැත' : 'No content added yet'}</span>`;
                 list.innerHTML += `
                     <div class="bg-[#0f0c1a] border border-slate-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-inner">
@@ -6102,8 +6147,14 @@ Answer: B</pre>
         function renderLeaderboard() {
             const list = document.getElementById('leaderboard-list');
             const empty = document.getElementById('leaderboard-empty');
+            const clearBtn = document.getElementById('leaderboard-clear-btn');
+            if (clearBtn) {
+                clearBtn.classList.toggle('hidden', !(currentUser && isAdminUser(currentUser)));
+                const clearTxt = document.getElementById('leaderboard-clear-text');
+                if (clearTxt) clearTxt.innerText = currentLang === 'si' ? 'Leaderboard එක Clear කරන්න' : 'Clear Leaderboard';
+            }
             const ranked = users
-                .filter(u => u.username !== 'admin')
+                .filter(u => !isAdminUser(u))
                 .map(u => ({ user: u, stats: computeUserStats(u) }))
                 .filter(r => r.stats.attempted > 0)
                 .sort((a, b) => b.stats.totalCorrect - a.stats.totalCorrect || b.stats.accuracy - a.stats.accuracy);
@@ -6131,6 +6182,25 @@ Answer: B</pre>
                     </div>
                 </div>`;
             }).join('');
+        }
+
+        /* Admin-only: wipes every student's quiz score history, which resets both
+           the leaderboard rankings and each student's own progress graph — there is
+           no separate "leaderboard score" store, it's derived live from quizScores. */
+        function clearLeaderboard() {
+            if (!currentUser || !isAdminUser(currentUser)) return;
+            const confirmMsg = currentLang === 'si'
+                ? "සියලුම සිසුන්ගේ Quiz ලකුණු ඉවත් කර Leaderboard එක clear කරන්නද? මෙයින් ඔවුන්ගේ Progress ප්‍රස්තාරයද reset වේ. මෙය ආපසු හැරවිය නොහැක."
+                : "Clear the leaderboard? This will erase every student's quiz score history (and reset their progress graphs too). This cannot be undone.";
+            if (!confirm(confirmMsg)) return;
+            users.forEach(u => {
+                if (!isAdminUser(u)) u.quizScores = {};
+            });
+            localStorage.setItem('moramaths_users', JSON.stringify(users));
+            cloudPush();
+            renderLeaderboard();
+            if (currentUser && !isAdminUser(currentUser) && typeof renderChart === 'function') renderChart();
+            showToast(currentLang === 'si' ? "Leaderboard එක clear කළා" : "Leaderboard cleared", 'success');
         }
 
         function toggleLeaderboardView() {
@@ -6425,10 +6495,14 @@ Answer: B</pre>
             const tg = document.getElementById('contact-telegram-link');
             const waEmpty = document.getElementById('contact-whatsapp-empty');
             const tgEmpty = document.getElementById('contact-telegram-empty');
+            const waGroup = document.getElementById('contact-whatsapp-group-link');
+            const tgGroup = document.getElementById('contact-telegram-group-link');
             if (contactData.whatsapp) { wa.href = contactData.whatsapp; wa.classList.remove('hidden'); if (waEmpty) waEmpty.classList.add('hidden'); }
             else { wa.classList.add('hidden'); if (waEmpty) waEmpty.classList.remove('hidden'); }
             if (contactData.telegram) { tg.href = contactData.telegram; tg.classList.remove('hidden'); if (tgEmpty) tgEmpty.classList.add('hidden'); }
             else { tg.classList.add('hidden'); if (tgEmpty) tgEmpty.classList.remove('hidden'); }
+            if (waGroup) { if (contactData.whatsappGroup) { waGroup.href = contactData.whatsappGroup; waGroup.classList.remove('hidden'); } else { waGroup.classList.add('hidden'); } }
+            if (tgGroup) { if (contactData.telegramGroup) { tgGroup.href = contactData.telegramGroup; tgGroup.classList.remove('hidden'); } else { tgGroup.classList.add('hidden'); } }
             renderContactPhoneSlot(1);
             renderContactPhoneSlot(2);
             renderMessageThread();
@@ -6452,10 +6526,14 @@ Answer: B</pre>
         function loadAdminContactForm() {
             const wa = document.getElementById('admin-contact-whatsapp');
             const tg = document.getElementById('admin-contact-telegram');
+            const waGroup = document.getElementById('admin-contact-whatsapp-group');
+            const tgGroup = document.getElementById('admin-contact-telegram-group');
             const p1 = document.getElementById('admin-contact-phone1');
             const p2 = document.getElementById('admin-contact-phone2');
             if (wa) wa.value = contactData.whatsapp || '';
             if (tg) tg.value = contactData.telegram || '';
+            if (waGroup) waGroup.value = contactData.whatsappGroup || '';
+            if (tgGroup) tgGroup.value = contactData.telegramGroup || '';
             if (p1) p1.value = contactData.phone1 || '';
             if (p2) p2.value = contactData.phone2 || '';
         }
@@ -6464,9 +6542,11 @@ Answer: B</pre>
             if (!isMasterAdmin(currentUser)) return;
             const wa = document.getElementById('admin-contact-whatsapp').value.trim();
             const tg = document.getElementById('admin-contact-telegram').value.trim();
+            const waGroup = document.getElementById('admin-contact-whatsapp-group').value.trim();
+            const tgGroup = document.getElementById('admin-contact-telegram-group').value.trim();
             const p1 = document.getElementById('admin-contact-phone1').value.trim();
             const p2 = document.getElementById('admin-contact-phone2').value.trim();
-            contactData = { whatsapp: wa, telegram: tg, phone1: p1, phone2: p2 };
+            contactData = { whatsapp: wa, telegram: tg, whatsappGroup: waGroup, telegramGroup: tgGroup, phone1: p1, phone2: p2 };
             localStorage.setItem('moramaths_contact', JSON.stringify(contactData));
             cloudPush();
             showToast("Contact Us links updated!", 'success');
@@ -7054,6 +7134,26 @@ Answer: B</pre>
                 return;
             }
             window.open(lesson.pdf, '_blank');
+        }
+
+        /* Lesson PDFs are stored as a Google Drive "/preview" link (for the in-app
+           viewer) or a direct file URL (R2 upload / any other host). For a direct
+           download we convert Drive preview/view links to Drive's "uc?export=download"
+           form; anything else is opened as-is, which the browser downloads directly
+           if it's already a raw file URL. */
+        function getPdfDownloadUrl(pdfUrl) {
+            const fileMatch = pdfUrl.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+            if (fileMatch) return `https://drive.google.com/uc?export=download&id=${fileMatch[1]}`;
+            return pdfUrl;
+        }
+
+        function downloadLessonPdf(lessonId) {
+            const lesson = findLesson(lessonId);
+            if (!lesson || !lesson.pdf || lesson.pdf.trim() === '' || lesson.pdf.trim() === '#') {
+                showToast(currentLang === 'si' ? "මෙම පාඩම සඳහා PDF එකක් තවම උඩුගත කර නොමැත" : "No PDF has been uploaded for this lesson yet", 'error');
+                return;
+            }
+            window.open(getPdfDownloadUrl(lesson.pdf), '_blank');
         }
 
         function openQuizModal(lessonId) {
