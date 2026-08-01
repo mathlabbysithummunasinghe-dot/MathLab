@@ -1281,6 +1281,7 @@
                  .master-admin-only class so they hide automatically for regular admins. -->
             <div id="admin-sidebar-links" class="hidden space-y-1">
                 <p class="sidebar-section-label" id="txt-sidebar-admin-controls">Controls</p>
+                <div class="sidebar-link" id="sidebar-link-leaderboard-admin" onclick="closeSidebarOnMobile(); toggleLeaderboardView(); setSidebarActive('sidebar-link-leaderboard-admin');"><i class="fa-solid fa-trophy w-4 text-center text-yellow-400"></i> <span>Leaderboard</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="dashboard" onclick="showAdminSection('dashboard')"><i class="fa-solid fa-gauge w-4 text-center text-indigo-300"></i> <span>Dashboard</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="zoom" onclick="showAdminSection('zoom')"><i class="fa-solid fa-video w-4 text-center text-rose-400"></i> <span>Zoom Class</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="lessons" onclick="showAdminSection('lessons')"><i class="fa-solid fa-book-medical w-4 text-center text-indigo-300"></i> <span>Add Lesson</span></div>
