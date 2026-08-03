@@ -157,6 +157,18 @@
         .quiz-option.correct-answer { background: rgba(16,185,129,0.18) !important; border-color: rgba(16,185,129,0.6) !important; }
         .quiz-option.wrong-answer { background: rgba(244,63,94,0.18) !important; border-color: rgba(244,63,94,0.6) !important; }
         .notif-dot { box-shadow: 0 0 0 2px #0b0914; }
+
+        /* Blinking cursor for the typewriter greeting effect */
+        .greeting-cursor { display: inline-block; margin-left: 2px; animation: greetingBlink 0.9s steps(1) infinite; color: #a5b4fc; }
+        @keyframes greetingBlink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+        /* Gentle staggered fade-up used to bring the dashboard to life on load */
+        @keyframes fadeUpIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+        .dash-fade-in { opacity: 0; animation: fadeUpIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+        .dash-fade-1 { animation-delay: .05s; }
+        .dash-fade-2 { animation-delay: .15s; }
+        .dash-fade-3 { animation-delay: .25s; }
+        .dash-fade-4 { animation-delay: .35s; }
         .rank-1 { background: linear-gradient(135deg,#f59e0b,#fbbf24); }
         .rank-2 { background: linear-gradient(135deg,#94a3b8,#cbd5e1); }
         .rank-3 { background: linear-gradient(135deg,#b45309,#d97706); }
@@ -1444,7 +1456,7 @@
 
         <!-- STUDENT DASHBOARD -->
         <div id="student-dashboard" class="hidden w-full max-w-6xl space-y-6">
-            <div class="bg-gradient-to-r from-[#181329] via-[#161224] to-[#211736] border border-slate-800/80 rounded-3xl p-6 sm:p-8 text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
+            <div class="dash-fade-in dash-fade-1 bg-gradient-to-r from-[#181329] via-[#161224] to-[#211736] border border-slate-800/80 rounded-3xl p-6 sm:p-8 text-white shadow-2xl flex flex-col md:flex-row justify-between items-center gap-6 relative overflow-hidden">
                 <div id="dashboard-banner-layer" class="absolute inset-0 pointer-events-none"></div>
                 <!-- Ambient decorative glows — keep the banner feeling designed/full even
                      when no custom banner image is set, or when the image is subtle. -->
@@ -1466,7 +1478,7 @@
             </div>
 
             <!-- LIVE BROADCAST BANNER (shown only while the admin has "Go Live" turned on) -->
-            <div id="live-broadcast-banner" class="hidden relative overflow-hidden bg-gradient-to-r from-rose-950 via-[#1a0d16] to-rose-950 border border-rose-500/50 rounded-3xl p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div id="live-broadcast-banner" class="hidden dash-fade-in dash-fade-2 relative overflow-hidden bg-gradient-to-r from-rose-950 via-[#1a0d16] to-rose-950 border border-rose-500/50 rounded-3xl p-5 shadow-2xl flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div class="absolute inset-0 opacity-30 pointer-events-none" style="background: radial-gradient(circle at 20% 50%, rgba(244,63,94,0.4), transparent 60%);"></div>
                 <div class="relative flex items-center gap-3.5 z-10 min-w-0">
                     <span class="relative flex h-3 w-3 shrink-0">
@@ -1484,7 +1496,7 @@
             </div>
 
             <!-- QUOTES BANNER -->
-            <div class="bg-indigo-950/40 border border-indigo-500/30 p-5 rounded-3xl backdrop-blur-md flex items-center gap-4 shadow-xl">
+            <div class="dash-fade-in dash-fade-3 bg-indigo-950/40 border border-indigo-500/30 p-5 rounded-3xl backdrop-blur-md flex items-center gap-4 shadow-xl">
                 <div class="w-10 h-10 rounded-2xl bg-indigo-600/30 border border-indigo-500/50 text-yellow-300 flex items-center justify-center shrink-0 text-sm">
                     <i class="fa-solid fa-quote-left"></i>
                 </div>
@@ -1495,7 +1507,7 @@
             </div>
 
             <!-- QUICK ACCESS: LIVE CLOCK + SPEED REVISION + FOCUS MODE -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="dash-fade-in dash-fade-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div class="lift-card bg-[#161224]/90 backdrop-blur-2xl border border-slate-800/80 p-5 rounded-3xl shadow-xl flex items-center justify-between gap-4">
                     <div class="min-w-0">
                         <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1" id="live-clock-date">--</p>
@@ -2135,9 +2147,10 @@
                                 <select id="quiz-target-lesson" onchange="renderQuizQuestionsList()" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white mt-1 focus:border-indigo-500 focus:outline-none transition"></select>
                             </div>
                         </div>
-                        <div class="flex gap-2 bg-[#0a0812] p-1 rounded-xl border border-slate-800 w-fit">
+                        <div class="flex gap-2 bg-[#0a0812] p-1 rounded-xl border border-slate-800 w-fit flex-wrap">
                             <button id="quiz-mode-manual-btn" onclick="setQuizBuilderMode('manual')" class="text-[11px] font-bold px-4 py-2 rounded-lg transition bg-indigo-600 text-white">✍️ Manual</button>
                             <button id="quiz-mode-bulk-btn" onclick="setQuizBuilderMode('bulk')" class="text-[11px] font-bold px-4 py-2 rounded-lg transition text-slate-400 hover:text-white">📋 Paste / Import</button>
+                            <button id="quiz-mode-html-btn" onclick="setQuizBuilderMode('html')" class="text-[11px] font-bold px-4 py-2 rounded-lg transition text-slate-400 hover:text-white">🖥️ Interactive HTML Quiz</button>
                         </div>
                         <div id="quiz-mode-manual" class="space-y-2.5">
                             <input type="text" id="quiz-q-text" placeholder="ප්‍රශ්නය (Question)" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition">
@@ -2180,6 +2193,21 @@ Answer: B</pre>
                                 <button onclick="previewBulkQuizImport()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer">👁️ Preview</button>
                                 <button onclick="confirmBulkQuizImport()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer shadow-lg">Import All Questions</button>
                             </div>
+                        </div>
+                        <div id="quiz-mode-html" class="hidden space-y-2.5">
+                            <div class="bg-[#161224] border border-slate-800 rounded-xl p-3 text-[10px] text-slate-400 leading-relaxed">
+                                Paste a <b class="text-slate-200">complete, self-contained interactive quiz</b> as raw HTML (e.g. exported from another quiz tool, with its own buttons/scoring/JS/CSS). It's shown to students exactly as-is, in its own sandboxed frame — it does <b class="text-slate-200">not</b> feed into the site's own scoring/leaderboard system. Use "Paste / Import" instead if you want questions to count toward quiz scores.
+                            </div>
+                            <textarea id="quiz-html-text" rows="8" placeholder="<html>...paste full interactive quiz HTML here...</html>" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition font-mono"></textarea>
+                            <div class="flex gap-2">
+                                <button onclick="previewHtmlQuiz()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer">👁️ Live Preview</button>
+                                <button onclick="saveHtmlQuiz()" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer shadow-lg">💾 Save as This Lesson's Quiz</button>
+                            </div>
+                            <div id="quiz-html-preview-wrap" class="hidden space-y-1.5">
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Live Preview</p>
+                                <iframe id="quiz-html-preview" sandbox="allow-scripts allow-forms allow-same-origin" class="w-full rounded-xl border border-slate-800 bg-white" style="height:340px;"></iframe>
+                            </div>
+                            <div id="quiz-html-current-note" class="hidden text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-xl px-3 py-2">✅ This lesson currently has a saved interactive HTML quiz. Saving new HTML above will replace it. <button onclick="clearHtmlQuiz()" class="text-rose-400 underline ml-1">Remove it</button></div>
                         </div>
                         <div id="quiz-questions-list" class="space-y-2 pt-2"></div>
                     </div>
@@ -3083,7 +3111,11 @@ Answer: B</pre>
 
         function setupTiltEffect() {
             let activeCard = null;
-            document.addEventListener('mousemove', (e) => {
+            let pendingEvent = null, rafScheduled = false;
+            function processTilt() {
+                rafScheduled = false;
+                const e = pendingEvent;
+                if (!e) return;
                 const card = e.target.closest('.lift-card, .tilt-card');
                 if (card !== activeCard) {
                     if (activeCard) resetTilt(activeCard);
@@ -3098,6 +3130,10 @@ Answer: B</pre>
                 const maxTilt = 4; // degrees — kept subtle so it feels smooth, not gimmicky
                 card.style.setProperty('--tiltY', `${(px - 0.5) * maxTilt * 2}deg`);
                 card.style.setProperty('--tiltX', `${(0.5 - py) * maxTilt * 2}deg`);
+            }
+            document.addEventListener('mousemove', (e) => {
+                pendingEvent = e;
+                if (!rafScheduled) { rafScheduled = true; requestAnimationFrame(processTilt); }
             }, { passive: true });
             document.addEventListener('mouseleave', () => { if (activeCard) { resetTilt(activeCard); activeCard = null; } }, true);
             function resetTilt(card) {
@@ -3960,7 +3996,7 @@ Answer: B</pre>
         /* ============ MATRIX MATH RAIN (login screen background) ============ */
         let matrixCtx = null, matrixColumns = 0, matrixDrops = [], matrixSpeeds = [], matrixTimer = null;
         const matrixSymbols = ['π','∫','Σ','√','∆','θ','÷','×','∞','ƒ','α','β','λ','µ','1','0','x','y','%','=','+','−','²','½'];
-        const MATRIX_ROW = 22, MATRIX_TRAIL = 16;
+        const MATRIX_ROW = 30, MATRIX_TRAIL = 8;
 
         function resizeMatrixCanvas() {
             const canvas = document.getElementById('matrix-canvas');
@@ -3979,8 +4015,12 @@ Answer: B</pre>
            band wherever a column had recently moved away and nothing had refreshed it
            yet (the visible horizontal seam). Drawing the whole trail every frame, and
            wrapping each column with modulo instead of a random reset, means the canvas
-           is completely and evenly filled top-to-bottom from the very first frame. */
+           is completely and evenly filled top-to-bottom from the very first frame.
+           Kept deliberately light on CPU: one random symbol pick per COLUMN per frame
+           (not per trail segment), a short trail, and wider column spacing — this was
+           previously heavy enough to cause visible lag on lower-end devices. */
         function drawMatrixFrame() {
+            if (document.hidden) return;
             const canvas = document.getElementById('matrix-canvas');
             if (!canvas || !matrixCtx) return;
             matrixCtx.clearRect(0, 0, canvas.width, canvas.height);
@@ -3988,9 +4028,9 @@ Answer: B</pre>
             const rowCount = canvas.height / MATRIX_ROW;
             for (let i = 0; i < matrixDrops.length; i++) {
                 const head = matrixDrops[i];
+                const symbol = matrixSymbols[(Math.random() * matrixSymbols.length) | 0];
                 for (let t = 0; t < MATRIX_TRAIL; t++) {
                     const wrapped = (((head - t) % rowCount) + rowCount) % rowCount;
-                    const symbol = matrixSymbols[Math.floor(Math.random() * matrixSymbols.length)];
                     const alpha = t === 0 ? 0.7 : 0.32 * (1 - t / MATRIX_TRAIL);
                     matrixCtx.fillStyle = t === 0 ? `rgba(199,210,254,${alpha})` : `rgba(99,102,241,${alpha})`;
                     matrixCtx.fillText(symbol, i * MATRIX_ROW, wrapped * MATRIX_ROW);
@@ -4002,13 +4042,13 @@ Answer: B</pre>
         function startMatrixRain() {
             const canvas = document.getElementById('matrix-canvas');
             if (!canvas) return;
+            canvas.classList.remove('opacity-0');
+            canvas.classList.add('opacity-100');
+            if (matrixTimer) return; // already running — don't reset/restart on every re-render
             matrixCtx = canvas.getContext('2d');
             resizeMatrixCanvas();
             drawMatrixFrame();
-            canvas.classList.remove('opacity-0');
-            canvas.classList.add('opacity-100');
-            if (matrixTimer) clearInterval(matrixTimer);
-            matrixTimer = setInterval(drawMatrixFrame, 55);
+            matrixTimer = setInterval(drawMatrixFrame, 80);
         }
 
         function stopMatrixRain() {
@@ -5083,12 +5123,32 @@ Answer: B</pre>
             initApp();
         }
 
+        let _greetingTypeTimer = null;
+        /* Types the greeting out character-by-character with a blinking cursor —
+           called each time the dashboard renders (login, language switch, re-render). */
+        function typeWriterGreeting(elId, fullText) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            if (_greetingTypeTimer) clearInterval(_greetingTypeTimer);
+            el.innerHTML = '<span class="greeting-typed-text"></span><span class="greeting-cursor">|</span>';
+            const textSpan = el.querySelector('.greeting-typed-text');
+            let i = 0;
+            _greetingTypeTimer = setInterval(() => {
+                i++;
+                textSpan.textContent = fullText.slice(0, i);
+                if (i >= fullText.length) {
+                    clearInterval(_greetingTypeTimer);
+                    _greetingTypeTimer = null;
+                }
+            }, 45);
+        }
+
         function setupStudentDashboard() {
             const t = translations[currentLang];
             renderContactUnreadBadge();
             renderLiveBanner();
             const formattedName = toTitleCase(currentUser.fullname);
-            document.getElementById('welcome-student-name').innerText = (currentLang === 'si' ? "ආයුබෝවන්, " : "Welcome, ") + formattedName + "!";
+            typeWriterGreeting('welcome-student-name', (currentLang === 'si' ? "ආයුබෝවන්, " : "Welcome, ") + formattedName + "!");
             document.getElementById('student-avatar').innerText = formattedName.charAt(0).toUpperCase();
             const idBadge = document.getElementById('dashboard-studentid-badge');
             if (idBadge) {
@@ -7164,7 +7224,14 @@ Answer: B</pre>
             document.getElementById('quiz-modal-title').innerText = lesson.title;
             const body = document.getElementById('quiz-body');
             const footer = document.getElementById('quiz-footer');
-            if (!lesson.quiz || lesson.quiz.length === 0) {
+            if (lesson.customQuizHtml) {
+                // A fully custom interactive HTML quiz pasted by the admin — rendered as-is
+                // in a sandboxed iframe (its own scripts/CSS run inside, isolated from the
+                // main site) instead of going through the structured MCQ scorer.
+                quizModalState = null;
+                body.innerHTML = `<iframe sandbox="allow-scripts allow-forms allow-same-origin" class="w-full rounded-xl border border-slate-800 bg-white" style="min-height:60vh;" srcdoc="${escapeHtml(lesson.customQuizHtml)}"></iframe>`;
+                footer.innerHTML = '';
+            } else if (!lesson.quiz || lesson.quiz.length === 0) {
                 body.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">${t.quizNoQuestions}</p>`;
                 footer.innerHTML = '';
                 quizModalState = null;
@@ -7393,17 +7460,58 @@ Answer: B</pre>
             const lessons = weeksData[weekIdx] ? weeksData[weekIdx].lessons : [];
             select.innerHTML = lessons.map(l => `<option value="${l.id}">${escapeHtml(l.title)}</option>`).join('') || '<option value="">No lessons in this week</option>';
             renderQuizQuestionsList();
+            refreshHtmlQuizNote();
         }
 
         function setQuizBuilderMode(mode) {
             document.getElementById('quiz-mode-manual').classList.toggle('hidden', mode !== 'manual');
             document.getElementById('quiz-mode-bulk').classList.toggle('hidden', mode !== 'bulk');
-            document.getElementById('quiz-mode-manual-btn').classList.toggle('bg-indigo-600', mode === 'manual');
-            document.getElementById('quiz-mode-manual-btn').classList.toggle('text-white', mode === 'manual');
-            document.getElementById('quiz-mode-manual-btn').classList.toggle('text-slate-400', mode !== 'manual');
-            document.getElementById('quiz-mode-bulk-btn').classList.toggle('bg-indigo-600', mode === 'bulk');
-            document.getElementById('quiz-mode-bulk-btn').classList.toggle('text-white', mode === 'bulk');
-            document.getElementById('quiz-mode-bulk-btn').classList.toggle('text-slate-400', mode !== 'bulk');
+            document.getElementById('quiz-mode-html').classList.toggle('hidden', mode !== 'html');
+            [['quiz-mode-manual-btn', 'manual'], ['quiz-mode-bulk-btn', 'bulk'], ['quiz-mode-html-btn', 'html']].forEach(([id, m]) => {
+                const btn = document.getElementById(id);
+                btn.classList.toggle('bg-indigo-600', mode === m);
+                btn.classList.toggle('text-white', mode === m);
+                btn.classList.toggle('text-slate-400', mode !== m);
+            });
+            if (mode === 'html') refreshHtmlQuizNote();
+        }
+
+        function refreshHtmlQuizNote() {
+            const lessonId = document.getElementById('quiz-target-lesson').value;
+            const lesson = findLesson(lessonId);
+            const note = document.getElementById('quiz-html-current-note');
+            if (note) note.classList.toggle('hidden', !(lesson && lesson.customQuizHtml));
+        }
+
+        function previewHtmlQuiz() {
+            const html = document.getElementById('quiz-html-text').value;
+            if (!html.trim()) { showToast("Paste some HTML first", 'error'); return; }
+            document.getElementById('quiz-html-preview-wrap').classList.remove('hidden');
+            document.getElementById('quiz-html-preview').srcdoc = html;
+        }
+
+        function saveHtmlQuiz() {
+            const lessonId = document.getElementById('quiz-target-lesson').value;
+            const lesson = findLesson(lessonId);
+            if (!lesson) { showToast("Add a lesson to this week first", 'error'); return; }
+            const html = document.getElementById('quiz-html-text').value;
+            if (!html.trim()) { showToast("Paste some HTML first", 'error'); return; }
+            lesson.customQuizHtml = html;
+            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            cloudPush();
+            refreshHtmlQuizNote();
+            showToast("Interactive HTML quiz saved for this lesson", 'success');
+        }
+
+        function clearHtmlQuiz() {
+            const lessonId = document.getElementById('quiz-target-lesson').value;
+            const lesson = findLesson(lessonId);
+            if (!lesson) return;
+            delete lesson.customQuizHtml;
+            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            cloudPush();
+            refreshHtmlQuizNote();
+            showToast("Removed — this lesson now uses its regular quiz questions", 'success');
         }
 
         /* Parses pasted text OR raw HTML (Word/Docs/anywhere) into quiz questions.
