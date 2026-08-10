@@ -2216,8 +2216,11 @@ Answer: B</pre>
                             </div>
                         </div>
                         <div id="quiz-mode-html" class="hidden space-y-2.5">
-                            <div class="bg-[#161224] border border-slate-800 rounded-xl p-3 text-[10px] text-slate-400 leading-relaxed">
-                                Paste a <b class="text-slate-200">complete, self-contained interactive quiz</b> as raw HTML (e.g. exported from another quiz tool, with its own buttons/scoring/JS/CSS). It's shown to students exactly as-is, in its own sandboxed frame — it does <b class="text-slate-200">not</b> feed into the site's own scoring/leaderboard system. Use "Paste / Import" instead if you want questions to count toward quiz scores.
+                            <div class="bg-[#161224] border border-slate-800 rounded-xl p-3 text-[10px] text-slate-400 leading-relaxed space-y-2">
+                                <p>Paste a <b class="text-slate-200">complete, self-contained interactive quiz</b> as raw HTML (e.g. exported from another quiz tool, with its own buttons/scoring/JS/CSS). It's shown to students exactly as-is, in its own sandboxed frame.</p>
+                                <p><b class="text-slate-200">To count the score on the site's Leaderboard/progress graph</b>, add this one line to your HTML's JS, right where it finishes calculating the student's result (replace <code class="text-indigo-300">yourCorrectCount</code> / <code class="text-indigo-300">yourTotalCount</code> with your own variables):</p>
+                                <pre class="bg-[#0a0812] rounded-lg p-2 text-[10px] text-indigo-300 whitespace-pre-wrap">window.parent.postMessage({ type: 'mathlab-quiz-result', correct: yourCorrectCount, total: yourTotalCount }, '*');</pre>
+                                <p>Without that line the quiz still shows fine, it just won't feed the Leaderboard. You can also use "Paste / Import" instead if you'd rather build the questions in the site's own quiz format.</p>
                             </div>
                             <textarea id="quiz-html-text" rows="8" placeholder="<html>...paste full interactive quiz HTML here...</html>" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition font-mono"></textarea>
                             <div class="flex gap-2">
@@ -4571,6 +4574,7 @@ Answer: B</pre>
         let progressChartInstance = null;
         let studentModalChartInstance = null;
         let quizModalState = null; // { lessonId, weekIdx, lessonIdx, answers: [] }
+        let activeCustomQuizLessonId = null; // lessonId of the interactive HTML quiz currently open in the modal, so we know which lesson a postMessage score belongs to
 
         function ensureDataIntegrity() {
             // Backfill lesson ids / quiz arrays for data saved by older versions of the app.
@@ -5524,7 +5528,7 @@ Answer: B</pre>
                 const scored = currentUser && currentUser.quizScores && currentUser.quizScores[l.id];
                 const hasView = l.lessonCode && l.lessonCode.trim() !== '';
                 const hasPdf = l.pdf && l.pdf.trim() !== '' && l.pdf.trim() !== '#';
-                const hasQuiz = l.quiz && l.quiz.length > 0;
+                const hasQuiz = (l.quiz && l.quiz.length > 0) || (l.customQuizHtml && l.customQuizHtml.trim() !== '');
                 const buttons = [];
                 if (hasView) buttons.push(`<button onclick="viewLessonCode('${l.id}')" class="bg-purple-600/20 hover:bg-purple-600 text-purple-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-purple-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer" title="Full-Screen Viewer"><i class="fa-solid fa-expand"></i> <span class="hidden xs:inline sm:inline">View</span></button>`);
                 if (hasPdf) buttons.push(`<button onclick="openLessonPdf('${l.id}')" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white text-[10px] font-bold px-2 sm:px-3 py-1.5 rounded-xl border border-indigo-500/30 transition flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer">${t.pdfBtn}</button>`);
@@ -7298,15 +7302,23 @@ Answer: B</pre>
             if (lesson.customQuizHtml) {
                 // A fully custom interactive HTML quiz pasted by the admin — rendered as-is
                 // in a sandboxed iframe (its own scripts/CSS run inside, isolated from the
-                // main site) instead of going through the structured MCQ scorer.
+                // main site). If the pasted HTML reports its result back via
+                // window.parent.postMessage({type:'mathlab-quiz-result', correct, total}, '*')
+                // when the student finishes, that score is captured (see the 'message'
+                // listener below) and saved into quizScores exactly like a normal quiz —
+                // so it counts toward the leaderboard and progress graph too.
                 quizModalState = null;
+                activeCustomQuizLessonId = lessonId;
                 body.innerHTML = `<iframe sandbox="allow-scripts allow-forms allow-same-origin" class="w-full rounded-xl border border-slate-800 bg-white" style="min-height:60vh;" srcdoc="${escapeHtml(lesson.customQuizHtml)}"></iframe>`;
-                footer.innerHTML = '';
+                const scoredCustom = currentUser && currentUser.quizScores && currentUser.quizScores[lesson.id];
+                footer.innerHTML = `<p id="quiz-html-live-result" class="w-full text-center text-[11px] ${scoredCustom ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${scoredCustom ? `✅ ${t.quizResultPrefix} ${scoredCustom.correct} / ${scoredCustom.total} — ${currentLang === 'si' ? 'Leaderboard එකට එකතු කර ඇත' : 'saved to the leaderboard'}` : (currentLang === 'si' ? 'Quiz එක සම්පූර්ණ කරන්න — ලකුණු ස්වයංක්‍රීයව Leaderboard එකට එකතු වේ.' : 'Finish the quiz — your score will be saved to the leaderboard automatically.')}</p>`;
             } else if (!lesson.quiz || lesson.quiz.length === 0) {
+                activeCustomQuizLessonId = null;
                 body.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">${t.quizNoQuestions}</p>`;
                 footer.innerHTML = '';
                 quizModalState = null;
             } else {
+                activeCustomQuizLessonId = null;
                 quizModalState = { lessonId, answers: new Array(lesson.quiz.length).fill(null) };
                 body.innerHTML = lesson.quiz.map((q, qi) => `
                     <div class="space-y-2">
@@ -7336,6 +7348,54 @@ Answer: B</pre>
         function closeQuizModal() {
             document.getElementById('quiz-modal').classList.add('hidden');
             quizModalState = null;
+            activeCustomQuizLessonId = null;
+        }
+
+        /* Listens for a score reported by a student-facing interactive HTML quiz
+           (rendered in the sandboxed iframe inside #quiz-body). Any quiz HTML the
+           admin pastes can opt into feeding the site's own scoring/leaderboard by
+           calling, once the student finishes:
+               window.parent.postMessage({ type: 'mathlab-quiz-result', correct: 7, total: 10 }, '*');
+           e.source is checked against the currently-open quiz iframe's contentWindow
+           so a message can't be spoofed by some other frame/tab. */
+        window.addEventListener('message', function(e) {
+            if (!e.data || e.data.type !== 'mathlab-quiz-result' || !activeCustomQuizLessonId || !currentUser) return;
+            const modalEl = document.getElementById('quiz-modal');
+            if (!modalEl || modalEl.classList.contains('hidden')) return;
+            const iframeEl = document.querySelector('#quiz-body iframe');
+            if (!iframeEl || e.source !== iframeEl.contentWindow) return;
+
+            let correct = Number(e.data.correct);
+            let total = Number(e.data.total);
+            if (!Number.isFinite(correct) || !Number.isFinite(total) || total <= 0) return;
+            correct = Math.max(0, Math.min(Math.round(correct), total));
+
+            recordCustomQuizScore(activeCustomQuizLessonId, correct, total);
+        });
+
+        function recordCustomQuizScore(lessonId, correct, total) {
+            const lesson = findLesson(lessonId);
+            if (!lesson || !currentUser) return;
+            currentUser.quizScores[lesson.id] = { correct, total, date: Date.now() };
+            localStorage.setItem('moramaths_current_user', JSON.stringify(currentUser));
+            const userIdx = users.findIndex(u => u.username === currentUser.username);
+            if (userIdx !== -1) {
+                users[userIdx].quizScores = currentUser.quizScores;
+                localStorage.setItem('moramaths_users', JSON.stringify(users));
+                cloudPush();
+            }
+            const t = translations[currentLang];
+            const resultEl = document.getElementById('quiz-html-live-result');
+            if (resultEl) {
+                resultEl.className = 'w-full text-center text-[11px] text-emerald-400 font-bold';
+                resultEl.innerText = `✅ ${t.quizResultPrefix} ${correct} / ${total} — ${currentLang === 'si' ? 'Leaderboard එකට එකතු කර ඇත' : 'saved to the leaderboard'}`;
+            }
+            showToast(`${t.quizResultPrefix} ${correct}/${total}`, correct === total ? 'success' : 'info');
+            if (total > 0 && correct === total) fireConfetti(50);
+            const xpGain = correct * 10 + ((total > 0 && correct === total) ? 20 : 0);
+            if (xpGain > 0) awardXP(xpGain, 'Quiz සම්පූර්ණ කිරීම', 'Completing the quiz');
+            checkAndAwardBadges();
+            if (document.getElementById('studentProgressChart')) renderChart();
         }
 
         function submitQuiz() {
