@@ -14,33 +14,19 @@
     <meta name="apple-mobile-web-app-title" content="MathLab">
     <!-- Preconnect: starts DNS+TLS handshake for these CDNs immediately instead of
          waiting until each resource tag is reached, shaving time off first paint. -->
-    <link rel="preconnect" href="https://cdn.tailwindcss.com">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
     <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            50: '#eef2ff',
-                            100: '#e0e7ff',
-                            500: '#6366f1',
-                            600: '#4f46e5',
-                            700: '#4338ca',
-                            900: '#312e81',
-                            950: '#1e1b4b',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
+    <!-- Tailwind CSS — precompiled static stylesheet (built with the Tailwind CLI against
+         this exact file's classes) instead of the cdn.tailwindcss.com "Play CDN" script.
+         The Play CDN recompiles every Tailwind class live in the browser via JS on every
+         DOM change, which is heavy on low-power devices (this is what caused the lag on
+         iPhone Safari). A plain <link> here is parsed once by the browser's native CSS
+         engine, so this file must be regenerated (same build command) any time new
+         Tailwind classes are added to the page that aren't already in it. -->
+    <link rel="stylesheet" href="output.css">
     <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Google Fonts -->
@@ -2218,9 +2204,10 @@ Answer: B</pre>
                         <div id="quiz-mode-html" class="hidden space-y-2.5">
                             <div class="bg-[#161224] border border-slate-800 rounded-xl p-3 text-[10px] text-slate-400 leading-relaxed space-y-2">
                                 <p>Paste a <b class="text-slate-200">complete, self-contained interactive quiz</b> as raw HTML (e.g. exported from another quiz tool, with its own buttons/scoring/JS/CSS). It's shown to students exactly as-is, in its own sandboxed frame.</p>
-                                <p><b class="text-slate-200">To count the score on the site's Leaderboard/progress graph</b>, add this one line to your HTML's JS, right where it finishes calculating the student's result (replace <code class="text-indigo-300">yourCorrectCount</code> / <code class="text-indigo-300">yourTotalCount</code> with your own variables):</p>
+                                <p><b class="text-slate-200">Score → Leaderboard:</b> if the quiz's final screen shows a plain result like <span class="text-indigo-300">"Score: 7/10"</span> or <span class="text-indigo-300">"7 out of 10"</span> or <span class="text-indigo-300">"ලකුණු 7/10"</span>, the site auto-detects it and saves it to the Leaderboard — no code needed.</p>
+                                <p>If your quiz shows the result some other way (a canvas drawing, an alert box, etc.) auto-detect won't catch it. For a guaranteed capture, add this one line to your HTML's JS where it finishes calculating the result:</p>
                                 <pre class="bg-[#0a0812] rounded-lg p-2 text-[10px] text-indigo-300 whitespace-pre-wrap">window.parent.postMessage({ type: 'mathlab-quiz-result', correct: yourCorrectCount, total: yourTotalCount }, '*');</pre>
-                                <p>Without that line the quiz still shows fine, it just won't feed the Leaderboard. You can also use "Paste / Import" instead if you'd rather build the questions in the site's own quiz format.</p>
+                                <p>You can also use "Paste / Import" instead if you'd rather build the questions in the site's own quiz format.</p>
                             </div>
                             <textarea id="quiz-html-text" rows="8" placeholder="<html>...paste full interactive quiz HTML here...</html>" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition font-mono"></textarea>
                             <div class="flex gap-2">
@@ -2388,7 +2375,7 @@ Answer: B</pre>
 
     <!-- QUIZ MODAL -->
     <div id="quiz-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="bg-[#161224] border border-slate-800 p-6 sm:p-7 rounded-3xl w-full max-w-lg space-y-5 shadow-2xl relative pop-in">
+        <div id="quiz-modal-panel" class="bg-[#161224] border border-slate-800 p-6 sm:p-7 rounded-3xl w-full max-w-lg space-y-5 shadow-2xl relative pop-in transition-[max-width] duration-150">
             <div class="flex justify-between items-center border-b border-slate-800 pb-3.5 gap-2">
                 <h3 id="quiz-modal-title" class="text-sm font-black text-white truncate">Quiz</h3>
                 <button onclick="closeQuizModal()" class="w-8 h-8 rounded-xl bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-xs cursor-pointer transition shrink-0"><i class="fa-solid fa-xmark"></i></button>
@@ -4574,7 +4561,8 @@ Answer: B</pre>
         let progressChartInstance = null;
         let studentModalChartInstance = null;
         let quizModalState = null; // { lessonId, weekIdx, lessonIdx, answers: [] }
-        let activeCustomQuizLessonId = null; // lessonId of the interactive HTML quiz currently open in the modal, so we know which lesson a postMessage score belongs to
+        let activeCustomQuizLessonId = null; // lessonId of the interactive HTML quiz currently open in the modal, so we know which lesson a postMessage/auto-detected score belongs to
+        let activeCustomQuizScoreRecorded = false; // guards against double-recording (postMessage + auto-detect both firing) for the same open quiz
 
         function ensureDataIntegrity() {
             // Backfill lesson ids / quiz arrays for data saved by older versions of the app.
@@ -7302,23 +7290,41 @@ Answer: B</pre>
             if (lesson.customQuizHtml) {
                 // A fully custom interactive HTML quiz pasted by the admin — rendered as-is
                 // in a sandboxed iframe (its own scripts/CSS run inside, isolated from the
-                // main site). If the pasted HTML reports its result back via
-                // window.parent.postMessage({type:'mathlab-quiz-result', correct, total}, '*')
-                // when the student finishes, that score is captured (see the 'message'
-                // listener below) and saved into quizScores exactly like a normal quiz —
-                // so it counts toward the leaderboard and progress graph too.
+                // main site). We try to capture its final score two ways so it counts
+                // toward the leaderboard/progress graph:
+                //  1) explicit: the pasted HTML calls
+                //     window.parent.postMessage({type:'mathlab-quiz-result', correct, total}, '*')
+                //     when the student finishes (see the 'message' listener below) — 100% reliable.
+                //  2) automatic: if no postMessage arrives, we watch the iframe's own DOM
+                //     (readable because of the allow-same-origin sandbox flag) for a plain
+                //     "Score: 7/10" / "7 out of 10" / "ලකුණු 7/10" style result and capture
+                //     that instead (see attachAutoScoreDetector) — best-effort, no code needed
+                //     from the admin, but can miss unusual formats.
                 quizModalState = null;
                 activeCustomQuizLessonId = lessonId;
-                body.innerHTML = `<iframe sandbox="allow-scripts allow-forms allow-same-origin" class="w-full rounded-xl border border-slate-800 bg-white" style="min-height:60vh;" srcdoc="${escapeHtml(lesson.customQuizHtml)}"></iframe>`;
+                activeCustomQuizScoreRecorded = false;
+                const panelEl = document.getElementById('quiz-modal-panel');
+                if (panelEl) panelEl.classList.remove('max-w-lg'), panelEl.classList.add('max-w-5xl');
+                body.classList.remove('max-h-[60vh]');
+                body.classList.add('max-h-[80vh]');
+                body.innerHTML = `<iframe id="quiz-html-student-iframe" sandbox="allow-scripts allow-forms allow-same-origin" class="w-full rounded-xl border border-slate-800 bg-white" style="min-height:75vh;" srcdoc="${escapeHtml(lesson.customQuizHtml)}"></iframe>`;
                 const scoredCustom = currentUser && currentUser.quizScores && currentUser.quizScores[lesson.id];
                 footer.innerHTML = `<p id="quiz-html-live-result" class="w-full text-center text-[11px] ${scoredCustom ? 'text-emerald-400 font-bold' : 'text-slate-500'}">${scoredCustom ? `✅ ${t.quizResultPrefix} ${scoredCustom.correct} / ${scoredCustom.total} — ${currentLang === 'si' ? 'Leaderboard එකට එකතු කර ඇත' : 'saved to the leaderboard'}` : (currentLang === 'si' ? 'Quiz එක සම්පූර්ණ කරන්න — ලකුණු ස්වයංක්‍රීයව Leaderboard එකට එකතු වේ.' : 'Finish the quiz — your score will be saved to the leaderboard automatically.')}</p>`;
+                const customIframeEl = document.getElementById('quiz-html-student-iframe');
+                if (customIframeEl) {
+                    customIframeEl.addEventListener('load', function() {
+                        attachAutoScoreDetector(customIframeEl, lessonId);
+                    });
+                }
             } else if (!lesson.quiz || lesson.quiz.length === 0) {
                 activeCustomQuizLessonId = null;
+                resetQuizModalSize();
                 body.innerHTML = `<p class="text-center text-xs text-slate-500 py-6">${t.quizNoQuestions}</p>`;
                 footer.innerHTML = '';
                 quizModalState = null;
             } else {
                 activeCustomQuizLessonId = null;
+                resetQuizModalSize();
                 quizModalState = { lessonId, answers: new Array(lesson.quiz.length).fill(null) };
                 body.innerHTML = lesson.quiz.map((q, qi) => `
                     <div class="space-y-2">
@@ -7345,10 +7351,19 @@ Answer: B</pre>
             });
         }
 
+        function resetQuizModalSize() {
+            const panelEl = document.getElementById('quiz-modal-panel');
+            const bodyEl = document.getElementById('quiz-body');
+            if (panelEl) panelEl.classList.remove('max-w-5xl'), panelEl.classList.add('max-w-lg');
+            if (bodyEl) bodyEl.classList.remove('max-h-[80vh]'), bodyEl.classList.add('max-h-[60vh]');
+        }
+
         function closeQuizModal() {
             document.getElementById('quiz-modal').classList.add('hidden');
             quizModalState = null;
             activeCustomQuizLessonId = null;
+            activeCustomQuizScoreRecorded = false;
+            resetQuizModalSize();
         }
 
         /* Listens for a score reported by a student-facing interactive HTML quiz
@@ -7359,7 +7374,7 @@ Answer: B</pre>
            e.source is checked against the currently-open quiz iframe's contentWindow
            so a message can't be spoofed by some other frame/tab. */
         window.addEventListener('message', function(e) {
-            if (!e.data || e.data.type !== 'mathlab-quiz-result' || !activeCustomQuizLessonId || !currentUser) return;
+            if (!e.data || e.data.type !== 'mathlab-quiz-result' || !activeCustomQuizLessonId || !currentUser || activeCustomQuizScoreRecorded) return;
             const modalEl = document.getElementById('quiz-modal');
             if (!modalEl || modalEl.classList.contains('hidden')) return;
             const iframeEl = document.querySelector('#quiz-body iframe');
@@ -7373,9 +7388,62 @@ Answer: B</pre>
             recordCustomQuizScore(activeCustomQuizLessonId, correct, total);
         });
 
+        /* Best-effort fallback for when the pasted quiz HTML doesn't call postMessage
+           itself: watches the iframe's own document (readable thanks to the
+           allow-same-origin sandbox flag, since srcdoc content inherits the parent's
+           origin) for a plainly-worded final score like "Score: 7/10", "7 out of 10"
+           or "ලකුණු 7/10", and captures that automatically. This can't see hidden
+           results (e.g. a canvas-drawn score, or one shown only via alert()), and a
+           quiz author who explicitly wants guaranteed capture should still use the
+           postMessage line — but for most exported quiz tools this needs zero extra
+           code from the admin. */
+        function attachAutoScoreDetector(iframeEl, lessonId) {
+            let doc;
+            try { doc = iframeEl.contentDocument; } catch (err) { return; } // cross-origin — nothing we can do, admin should use postMessage
+            if (!doc) return;
+
+            const scorePatterns = [
+                /(?:score|result|marks|ලකුණු|ප්‍රතිඵලය|you\s*got|correct\s*answers?)\s*[:\-]?\s*(\d{1,3})\s*(?:\/|out\s*of)\s*(\d{1,3})/i,
+                /(\d{1,3})\s*(?:\/|out\s*of)\s*(\d{1,3})\s*(?:correct|score|marks|ලකුණු)/i
+            ];
+            const tryDetect = () => {
+                if (activeCustomQuizLessonId !== lessonId || activeCustomQuizScoreRecorded) return;
+                if (!doc.body) return;
+                const text = doc.body.innerText || doc.body.textContent || '';
+                for (const re of scorePatterns) {
+                    const m = text.match(re);
+                    if (m) {
+                        const correct = parseInt(m[1], 10);
+                        const total = parseInt(m[2], 10);
+                        if (Number.isFinite(correct) && Number.isFinite(total) && total > 0 && correct <= total) {
+                            recordCustomQuizScore(lessonId, correct, total);
+                            return;
+                        }
+                    }
+                }
+            };
+
+            let observer;
+            try {
+                observer = new MutationObserver(() => tryDetect());
+                observer.observe(doc.body || doc.documentElement, { childList: true, subtree: true, characterData: true });
+            } catch (err) { /* ignore */ }
+            tryDetect(); // in case the score is present immediately (e.g. a static results page)
+
+            const stopCheck = setInterval(() => {
+                const modalEl = document.getElementById('quiz-modal');
+                if (activeCustomQuizScoreRecorded || activeCustomQuizLessonId !== lessonId || !modalEl || modalEl.classList.contains('hidden')) {
+                    if (observer) observer.disconnect();
+                    clearInterval(stopCheck);
+                }
+            }, 1000);
+        }
+
         function recordCustomQuizScore(lessonId, correct, total) {
+            if (activeCustomQuizScoreRecorded) return;
             const lesson = findLesson(lessonId);
             if (!lesson || !currentUser) return;
+            activeCustomQuizScoreRecorded = true;
             currentUser.quizScores[lesson.id] = { correct, total, date: Date.now() };
             localStorage.setItem('moramaths_current_user', JSON.stringify(currentUser));
             const userIdx = users.findIndex(u => u.username === currentUser.username);
