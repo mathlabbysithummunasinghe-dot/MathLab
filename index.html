@@ -1448,6 +1448,17 @@
                     <label id="lbl-reg-pass" class="text-[11px] font-bold text-slate-300 uppercase tracking-wider block whitespace-nowrap overflow-hidden text-ellipsis">මුරපදය (Password)</label>
                     <input type="password" id="reg-password" required class="w-full bg-[#0f0c1a] border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500 transition shadow-inner" placeholder="••••••••">
                 </div>
+                <div class="space-y-1.5">
+                    <label id="lbl-reg-medium" class="text-[11px] font-bold text-slate-300 uppercase tracking-wider block">Medium</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center justify-center gap-1.5 bg-[#0f0c1a] border border-indigo-500 rounded-xl px-3 py-2.5 text-xs text-white cursor-pointer transition has-[:checked]:bg-indigo-600/20">
+                            <input type="radio" name="reg-medium" value="si" checked class="accent-indigo-500"> සිංහල මාධ්‍යය
+                        </label>
+                        <label class="flex items-center justify-center gap-1.5 bg-[#0f0c1a] border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white cursor-pointer transition has-[:checked]:bg-indigo-600/20 has-[:checked]:border-indigo-500">
+                            <input type="radio" name="reg-medium" value="en" class="accent-indigo-500"> English Medium
+                        </label>
+                    </div>
+                </div>
                 <button type="submit" id="btn-reg-submit" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold py-3 rounded-xl transition shadow-xl cursor-pointer tracking-wide mt-2 shine-btn">Register & Send OTP</button>
             </form>
                 </div>
@@ -1632,6 +1643,11 @@
                 <div class="flex items-center justify-between border-b border-slate-800 pb-4 gap-3">
                     <h2 class="text-lg font-black text-white flex items-center gap-2"><i class="fa-solid fa-calendar-days text-indigo-400"></i> <span id="schedule-section-title">Speed Revision 2026 — 16 Week Mega Schedule</span></h2>
                     <button onclick="toggleScheduleView()" class="bg-slate-900/80 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-bold px-3 py-1.5 rounded-xl cursor-pointer transition shrink-0"><i class="fa-solid fa-arrow-left mr-1"></i> <span id="schedule-back">Back</span></button>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Medium:</span>
+                    <button id="medium-toggle-student-si" onclick="setActiveMedium('si')" class="text-[11px] font-bold px-3 py-1.5 rounded-lg border cursor-pointer transition">සිංහල මාධ්‍යය</button>
+                    <button id="medium-toggle-student-en" onclick="setActiveMedium('en')" class="text-[11px] font-bold px-3 py-1.5 rounded-lg border cursor-pointer transition">English Medium</button>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4" id="weeks-grid"></div>
             </div>
@@ -2130,6 +2146,11 @@
                 <!-- WEEKS & LESSONS MANAGER -->
                 <div class="admin-section hidden" data-section="weeks">
                     <h3 id="anchor-weeks" class="text-xs font-extrabold text-indigo-300 flex items-center gap-2"><i class="fa-solid fa-layer-group"></i> සති සහ පාඩම් කළමනාකරණය (Manage Weeks &amp; Lessons)</h3>
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Medium:</span>
+                        <button id="medium-toggle-si" onclick="setActiveMedium('si')" class="text-[11px] font-bold px-3 py-1.5 rounded-lg border cursor-pointer transition">සිංහල මාධ්‍යය</button>
+                        <button id="medium-toggle-en" onclick="setActiveMedium('en')" class="text-[11px] font-bold px-3 py-1.5 rounded-lg border cursor-pointer transition">English Medium</button>
+                    </div>
                     <div id="admin-weeks-manager" class="grid grid-cols-1 lg:grid-cols-2 gap-4"></div>
                 </div>
 
@@ -2937,7 +2958,12 @@ Answer: B</pre>
                 users = currentUser ? sanitizeUsersArray(data.users, currentUser.username, isAdminUser(currentUser)) : data.users;
                 localStorage.setItem('moramaths_users', JSON.stringify(users));
             }
-            if (data.weeksData) { weeksData = data.weeksData; localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData)); }
+            if (data.weeksDataSi || data.weeksDataEn || data.weeksData) {
+                weeksDataSi = data.weeksDataSi || data.weeksData || weeksDataSi; // legacy docs stored the Sinhala track as weeksData
+                weeksDataEn = data.weeksDataEn || weeksDataEn;
+                weeksData = activeMedium === 'en' ? weeksDataEn : weeksDataSi;
+                saveWeeksData();
+            }
             if (data.zoomData) { zoomData = data.zoomData; localStorage.setItem('moramaths_zoom', JSON.stringify(zoomData)); }
             if (data.notifications) { notifications = data.notifications; localStorage.setItem('moramaths_notifications', JSON.stringify(notifications)); }
             if (data.siteAssets) { siteAssets = data.siteAssets; localStorage.setItem('moramaths_site_assets', JSON.stringify(siteAssets)); }
@@ -3040,7 +3066,7 @@ Answer: B</pre>
                 });
             }
             const payload = stripUndefinedDeep({
-                users: usersToPush, weeksData, zoomData, notifications, siteAssets, progressGraphConfig, goalsData,
+                users: usersToPush, weeksDataSi, weeksDataEn, zoomData, notifications, siteAssets, progressGraphConfig, goalsData,
                 pastPapersData, contactData, studentMessages, songPlaylists, nextStudentIdSeq,
                 updatedAt: Date.now()
             });
@@ -4478,7 +4504,12 @@ Answer: B</pre>
         let zoomData = JSON.parse(localStorage.getItem('moramaths_zoom')) || {
             link: "https://zoom.us/j/example", id: "123 456 7890", pass: "12345", isLive: false
         };
-        let weeksData = JSON.parse(localStorage.getItem('moramaths_weeks')) || Array.from({length: 16}, (_, i) => ({
+        // Speed Revision now has two parallel tracks — Sinhala medium and English
+        // medium — each with their own 16 weeks/lessons/quizzes. `weeksData` stays
+        // as a single "currently active" pointer so every existing function that
+        // reads/writes weeksData keeps working untouched; setActiveMedium() just
+        // repoints it. Both tracks are always persisted (see saveWeeksData/cloudPush).
+        let weeksDataSi = JSON.parse(localStorage.getItem('moramaths_weeks_si')) || JSON.parse(localStorage.getItem('moramaths_weeks')) || Array.from({length: 16}, (_, i) => ({
             week: i + 1,
             title: currentLang === 'si' ? `සතිය ${i + 1} පුනරීක්ෂණය` : `Week ${i + 1} Revision`,
             thumbnail: "",
@@ -4497,6 +4528,41 @@ Answer: B</pre>
                 }
             ]
         }));
+        let weeksDataEn = JSON.parse(localStorage.getItem('moramaths_weeks_en')) || Array.from({length: 16}, (_, i) => ({
+            week: i + 1,
+            title: `Week ${i + 1} Revision`,
+            thumbnail: "",
+            recordedVideo: "",
+            isLocked: i !== 0,
+            lessons: []
+        }));
+        let activeMedium = 'si';
+        let weeksData = weeksDataSi;
+        function saveWeeksData() {
+            localStorage.setItem('moramaths_weeks_si', JSON.stringify(weeksDataSi));
+            localStorage.setItem('moramaths_weeks_en', JSON.stringify(weeksDataEn));
+            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksDataSi)); // legacy key, kept in sync for older code paths
+        }
+        // Switches which track weeksData points to, and re-renders whatever is on screen.
+        function setActiveMedium(which) {
+            activeMedium = which === 'en' ? 'en' : 'si';
+            weeksData = activeMedium === 'en' ? weeksDataEn : weeksDataSi;
+            if (typeof renderWeeksGrid === 'function') renderWeeksGrid();
+            if (typeof renderAdminWeeksManager === 'function') renderAdminWeeksManager();
+            if (typeof populateAdminWeekSelect === 'function') populateAdminWeekSelect();
+            if (typeof updateMediumToggleUI === 'function') updateMediumToggleUI();
+        }
+        function updateMediumToggleUI() {
+            const activeCls = ['bg-indigo-600', 'border-indigo-500', 'text-white'];
+            const inactiveCls = ['bg-slate-900/80', 'border-slate-800', 'text-slate-300'];
+            ['medium-toggle-si', 'medium-toggle-en', 'medium-toggle-student-si', 'medium-toggle-student-en'].forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                const isActive = id.endsWith('-' + activeMedium);
+                el.classList.remove(...activeCls, ...inactiveCls);
+                el.classList.add(...(isActive ? activeCls : inactiveCls));
+            });
+        }
         let notifications = JSON.parse(localStorage.getItem('moramaths_notifications')) || [
             { id: uid(), text: currentLang === 'si' ? "MathLab වෙත සාදරයෙන් පිළිගනිමු! 🎉" : "Welcome to MathLab! 🎉", date: Date.now() }
         ];
@@ -4508,14 +4574,14 @@ Answer: B</pre>
 
         function ensureDataIntegrity() {
             // Backfill lesson ids / quiz arrays for data saved by older versions of the app.
-            weeksData.forEach(w => {
+            [weeksDataSi, weeksDataEn].forEach(track => track.forEach(w => {
                 if (w.thumbnail === undefined) w.thumbnail = '';
                 w.lessons.forEach(l => {
                     if (!l.id) l.id = uid();
                     if (!l.quiz) l.quiz = [];
                     if (l.lessonCode === undefined) l.lessonCode = '';
                 });
-            });
+            }));
             let assignedNewStudentIds = false;
             let adminEmailFixed = false;
             let adminUsernameRenamed = false;
@@ -4682,6 +4748,9 @@ Answer: B</pre>
         }
 
         function initApp() {
+            activeMedium = (currentUser && !isAdminUser(currentUser) && currentUser.medium === 'en') ? 'en' : 'si';
+            weeksData = activeMedium === 'en' ? weeksDataEn : weeksDataSi;
+            if (typeof updateMediumToggleUI === 'function') updateMediumToggleUI();
             applyBrandLogo();
             ensureDataIntegrity();
             applyLanguage();
@@ -4946,6 +5015,8 @@ Answer: B</pre>
             const email = document.getElementById('reg-email').value.trim().toLowerCase();
             const username = document.getElementById('reg-username').value.trim().toLowerCase();
             const password = document.getElementById('reg-password').value.trim();
+            const mediumInput = document.querySelector('input[name="reg-medium"]:checked');
+            const medium = mediumInput ? mediumInput.value : 'si';
 
             if (!fullname || !email || !username || !password) {
                 showToast(currentLang === 'si' ? "කරුණාකර සියලුම කොටස් පුරවන්න." : "Please fill in all fields.", 'error');
@@ -4960,7 +5031,7 @@ Answer: B</pre>
                 return;
             }
 
-            tempRegData = { fullname, email, username, password, quizScores: {}, paidUntil: null, xp: 0, badges: [] };
+            tempRegData = { fullname, email, username, password, medium, quizScores: {}, paidUntil: null, xp: 0, badges: [] };
 
             formBusy = true;
             const btn = document.getElementById('btn-reg-submit');
@@ -5889,7 +5960,7 @@ Answer: B</pre>
             if (!title) { showToast("Please enter a lesson title", 'error'); return; }
             weeksData[weekIndex].lessons.push({ id: uid(), title, pdf, activity, quiz: [], lessonCode });
             try {
-                localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+                saveWeeksData();
                 cloudPush();
             } catch (err) {
                 weeksData[weekIndex].lessons.pop();
@@ -7350,7 +7421,7 @@ Answer: B</pre>
 
         function setWeekThumbnail(weekIdx, url) {
             weeksData[weekIdx].thumbnail = url.trim();
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             renderWeeksGrid();
             renderAdminWeeksManager();
@@ -7365,7 +7436,7 @@ Answer: B</pre>
                 return;
             }
             weeksData[weekIdx].recordedVideo = url;
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             renderWeeksGrid();
             renderAdminWeeksManager();
@@ -7376,7 +7447,7 @@ Answer: B</pre>
             newTitle = newTitle.trim();
             if (!newTitle) { renderAdminWeeksManager(); return; }
             weeksData[weekIdx].title = newTitle;
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             renderWeeksGrid();
             populateAdminWeekSelect();
@@ -7386,7 +7457,7 @@ Answer: B</pre>
 
         function toggleWeekLock(weekIdx) {
             weeksData[weekIdx].isLocked = !weeksData[weekIdx].isLocked;
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             renderWeeksGrid();
             renderAdminWeeksManager();
@@ -7395,7 +7466,7 @@ Answer: B</pre>
         function deleteLesson(lessonId) {
             if (!confirm('Delete this lesson? This cannot be undone.')) return;
             weeksData.forEach(w => { w.lessons = w.lessons.filter(l => l.id !== lessonId); });
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             renderWeeksGrid();
             renderAdminWeeksManager();
@@ -7433,7 +7504,7 @@ Answer: B</pre>
             lesson.pdf = processPdfLink(document.getElementById('edit-lesson-pdf').value.trim() || '#');
             lesson.lessonCode = document.getElementById('edit-lesson-code').value.trim();
             try {
-                localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+                saveWeeksData();
                 cloudPush();
             } catch (err) {
                 lesson.title = prevTitle; lesson.pdf = prevPdf; lesson.lessonCode = prevCode;
@@ -7497,7 +7568,7 @@ Answer: B</pre>
             const html = document.getElementById('quiz-html-text').value;
             if (!html.trim()) { showToast("Paste some HTML first", 'error'); return; }
             lesson.customQuizHtml = html;
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             refreshHtmlQuizNote();
             showToast("Interactive HTML quiz saved for this lesson", 'success');
@@ -7508,7 +7579,7 @@ Answer: B</pre>
             const lesson = findLesson(lessonId);
             if (!lesson) return;
             delete lesson.customQuizHtml;
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             refreshHtmlQuizNote();
             showToast("Removed — this lesson now uses its regular quiz questions", 'success');
@@ -7585,7 +7656,7 @@ Answer: B</pre>
             const incomplete = parsed.filter(q => q.options.some(o => !o));
             if (incomplete.length) { showToast(`${incomplete.length} question(s) are missing an option (need all 4) — fix and re-paste`, 'error'); return; }
             parsed.forEach(q => lesson.quiz.push(q));
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             document.getElementById('quiz-bulk-text').value = '';
             document.getElementById('quiz-bulk-preview').classList.add('hidden');
@@ -7603,7 +7674,7 @@ Answer: B</pre>
             const correct = Number(document.getElementById('quiz-correct-idx').value);
             if (!q || opts.some(o => !o)) { showToast("Fill in the question and all 4 options", 'error'); return; }
             lesson.quiz.push({ q, options: opts, correct });
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             document.getElementById('quiz-q-text').value = '';
             [0, 1, 2, 3].forEach(i => document.getElementById(`quiz-opt-${i}`).value = '');
@@ -7629,7 +7700,7 @@ Answer: B</pre>
             const lesson = findLesson(lessonId);
             if (!lesson) return;
             lesson.quiz.splice(qi, 1);
-            localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+            saveWeeksData();
             cloudPush();
             renderQuizQuestionsList();
             renderAdminWeeksManager();
@@ -7893,7 +7964,7 @@ Answer: B</pre>
         function exportSiteData() {
             const backup = {
                 exportedAt: new Date().toISOString(),
-                users, weeksData, zoomData, notifications, siteAssets, progressGraphConfig
+                users, weeksDataSi, weeksDataEn, zoomData, notifications, siteAssets, progressGraphConfig
             };
             const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
@@ -7915,15 +7986,17 @@ Answer: B</pre>
             reader.onload = (e) => {
                 try {
                     const data = JSON.parse(e.target.result);
-                    if (!data.users || !data.weeksData) throw new Error('Invalid backup file');
+                    if (!data.users || (!data.weeksData && !data.weeksDataSi)) throw new Error('Invalid backup file');
                     users = data.users;
-                    weeksData = data.weeksData;
+                    weeksDataSi = data.weeksDataSi || data.weeksData; // older backups only had one (Sinhala) track
+                    weeksDataEn = data.weeksDataEn || weeksDataEn;
+                    weeksData = activeMedium === 'en' ? weeksDataEn : weeksDataSi;
                     zoomData = data.zoomData || zoomData;
                     notifications = data.notifications || notifications;
                     siteAssets = data.siteAssets || siteAssets;
                     progressGraphConfig = data.progressGraphConfig || progressGraphConfig;
                     localStorage.setItem('moramaths_users', JSON.stringify(users));
-                    localStorage.setItem('moramaths_weeks', JSON.stringify(weeksData));
+                    saveWeeksData();
                     localStorage.setItem('moramaths_zoom', JSON.stringify(zoomData));
                     localStorage.setItem('moramaths_notifications', JSON.stringify(notifications));
                     localStorage.setItem('moramaths_site_assets', JSON.stringify(siteAssets));
