@@ -1160,9 +1160,9 @@
                 inputEl.value = ''; resetLabel();
                 return;
             }
-            const MAX_BYTES = 60 * 1024 * 1024; // 60MB — generous for a short square clip
+            const MAX_BYTES = 500 * 1024 * 1024; // 500MB per video
             if (file.size > MAX_BYTES) {
-                showToast("Video is too large (please choose under 60MB, or trim it shorter).", 'error');
+                showToast("Video is too large (please choose under 500MB, or compress it shorter).", 'error');
                 inputEl.value = ''; resetLabel();
                 return;
             }
@@ -1225,13 +1225,21 @@
                 return;
             }
             if (empty) empty.classList.add('hidden');
-            wrap.innerHTML = shortVideos.map(v => `
+            wrap.innerHTML = shortVideos.map(v => {
+                const ytId = extractYouTubeId(v.url);
+                const mediaHtml = ytId
+                    ? `<img src="https://img.youtube.com/vi/${ytId}/hqdefault.jpg" class="w-full object-cover bg-black" style="aspect-ratio:1/1;" alt="">`
+                    : `<video src="${v.url}" class="w-full object-cover bg-black" style="aspect-ratio:1/1;" muted preload="metadata"></video>`;
+                const ytBadge = ytId ? `<span class="absolute top-2 left-2 text-rose-500 text-sm drop-shadow"><i class="fa-brands fa-youtube"></i></span>` : '';
+                return `
                 <div class="relative group bg-[#161224] border border-slate-800 rounded-xl overflow-hidden">
-                    <video src="${v.url}" class="w-full aspect-square object-cover bg-black" muted preload="metadata"></video>
-                    <button onclick="deleteShortVideo('${v.id}')" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md bg-black/60 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] cursor-pointer transition"><i class="fa-solid fa-xmark"></i></button>
+                    ${mediaHtml}
+                    ${ytBadge}
+                    <button onclick="deleteShortVideo('${v.id}')" class="absolute top-2 right-2 w-6 h-6 rounded-md bg-black/60 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] cursor-pointer transition"><i class="fa-solid fa-xmark"></i></button>
                     <p class="text-[10px] font-semibold text-slate-300 px-2 py-1.5 truncate">${escapeHtml(v.title || 'Untitled')}</p>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
 
         /* ============ SHORT VIDEOS — STUDENT DASHBOARD STRIP + FULL-SCREEN "REELS" PLAYER ============ */
@@ -1241,15 +1249,23 @@
             if (!section || !strip) return;
             if (!shortVideos.length) { section.classList.add('hidden'); return; }
             section.classList.remove('hidden');
-            strip.innerHTML = shortVideos.map((v, i) => `
-                <button onclick="openReelsPlayer(${i})" class="relative shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border border-slate-800 bg-black cursor-pointer group">
-                    <video src="${v.url}" class="w-full h-full object-cover" muted preload="metadata"></video>
-                    <div class="absolute inset-0 bg-black/20 group-hover:bg-black/35 transition flex items-center justify-center">
-                        <div class="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center text-white text-xs"><i class="fa-solid fa-play ml-0.5"></i></div>
+            strip.innerHTML = shortVideos.map((v, i) => {
+                const ytId = extractYouTubeId(v.url);
+                const mediaHtml = ytId
+                    ? `<img src="https://img.youtube.com/vi/${ytId}/hqdefault.jpg" class="w-full h-full object-cover" alt="">`
+                    : `<video src="${v.url}" class="w-full h-full object-cover" muted preload="metadata"></video>`;
+                const ytBadge = ytId ? `<span class="absolute top-2 left-2 text-rose-500 text-sm drop-shadow z-10"><i class="fa-brands fa-youtube"></i></span>` : '';
+                return `
+                <button onclick="openReelsPlayer(${i})" class="relative shrink-0 w-28 h-28 rounded-2xl overflow-hidden border border-slate-800 bg-black cursor-pointer group">
+                    ${mediaHtml}
+                    ${ytBadge}
+                    <div class="absolute inset-0 bg-black/20 transition flex items-center justify-center">
+                        <div class="w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center text-white text-xs"><i class="fa-solid fa-play ml-1"></i></div>
                     </div>
-                    <p class="absolute bottom-1 left-1.5 right-1.5 text-[9px] font-bold text-white truncate drop-shadow">${escapeHtml(v.title || '')}</p>
+                    <p class="absolute text-[9px] font-bold text-white truncate drop-shadow" style="bottom:4px;left:6px;right:6px;">${escapeHtml(v.title || '')}</p>
                 </button>
-            `).join('');
+            `;
+            }).join('');
         }
 
         let reelsCurrentIndex = 0;
@@ -1268,8 +1284,10 @@
 
         function closeReelsPlayer() {
             const video = document.getElementById('reels-video');
+            const ytFrame = document.getElementById('reels-video-yt');
             video.pause();
             video.src = '';
+            ytFrame.src = '';
             document.getElementById('reels-player-overlay').classList.add('hidden');
             document.removeEventListener('keydown', reelsKeydownHandler);
             const stage = document.getElementById('reels-stage');
@@ -1282,12 +1300,34 @@
             const v = shortVideos[reelsCurrentIndex];
             if (!v) return;
             const video = document.getElementById('reels-video');
-            video.src = v.url;
-            video.currentTime = 0;
-            video.onended = () => reelsNext();
-            video.onplay = () => updateReelsPlayPauseIcon(true);
-            video.onpause = () => updateReelsPlayPauseIcon(false);
-            video.play().catch(() => { /* autoplay-with-sound may be blocked on some browsers — user can tap to play */ });
+            const ytFrame = document.getElementById('reels-video-yt');
+            const nativeControls = document.getElementById('reels-native-controls');
+            const tapLayer = document.getElementById('reels-tap-layer');
+            const ytId = extractYouTubeId(v.url);
+            if (ytId) {
+                // YouTube link — embed YouTube's own player instead of the <video> tag
+                // (YouTube pages aren't playable video files). Auto-advance-on-end and
+                // our custom mute/volume/play-pause controls don't apply here — YouTube's
+                // own on-screen controls take over instead.
+                video.pause(); video.removeAttribute('src'); video.onended = null;
+                video.classList.add('hidden');
+                ytFrame.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0&modestbranding=1&playsinline=1`;
+                ytFrame.classList.remove('hidden');
+                if (nativeControls) nativeControls.classList.add('hidden');
+                if (tapLayer) tapLayer.style.pointerEvents = 'none'; // let clicks reach YouTube's own on-screen controls
+                document.getElementById('reels-center-play-icon').classList.add('hidden');
+            } else {
+                ytFrame.src = ''; ytFrame.classList.add('hidden');
+                if (tapLayer) tapLayer.style.pointerEvents = '';
+                video.classList.remove('hidden');
+                video.src = v.url;
+                video.currentTime = 0;
+                video.onended = () => reelsNext();
+                video.onplay = () => updateReelsPlayPauseIcon(true);
+                video.onpause = () => updateReelsPlayPauseIcon(false);
+                video.play().catch(() => { /* autoplay-with-sound may be blocked on some browsers — user can tap to play */ });
+                if (nativeControls) nativeControls.classList.remove('hidden');
+            }
             document.getElementById('reels-video-title').innerText = v.title || '';
             document.getElementById('reels-index-badge').innerText = `${reelsCurrentIndex + 1} / ${shortVideos.length}`;
         }
@@ -1685,6 +1725,16 @@
                     </div>
                 </div>
                 <div id="student-zoom-box" class="relative bg-[#120f1d]/90 backdrop-blur-md border border-indigo-500/40 p-5 rounded-2xl w-full md:w-80 shadow-2xl z-10"></div>
+            </div>
+
+            <!-- DASHBOARD WELCOME VIDEO — auto-plays (muted) the moment the dashboard loads,
+                 whether the student logged in manually or was auto-logged-in from a saved session.
+                 Only shown when the admin has set one under Site Appearance. -->
+            <div id="welcome-video-section" class="hidden dash-fade-in dash-fade-2 relative bg-black border border-slate-800/80 rounded-3xl overflow-hidden shadow-2xl">
+                <button onclick="dismissWelcomeVideo()" title="Close" class="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-black/60 border border-white/20 text-white flex items-center justify-center text-xs cursor-pointer hover:bg-white/10 transition"><i class="fa-solid fa-xmark"></i></button>
+                <button onclick="toggleWelcomeVideoMute()" id="welcome-video-mute-btn" title="Mute / Unmute" class="absolute z-10 w-9 h-9 rounded-full bg-black/60 border border-white/20 text-white flex items-center justify-center text-sm cursor-pointer hover:bg-white/10 transition" style="bottom:12px; right:12px;"><i class="fa-solid fa-volume-xmark" id="welcome-video-mute-icon"></i></button>
+                <video id="welcome-video-player" class="w-full bg-black" style="max-height:420px; object-fit:contain;" autoplay muted loop playsinline webkit-playsinline></video>
+                <iframe id="welcome-video-yt" class="hidden w-full" style="height:min(420px,56.25vw); border:0;" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
             </div>
 
             <!-- LIVE BROADCAST BANNER (shown only while the admin has "Go Live" turned on) -->
@@ -2238,7 +2288,7 @@
                 <div class="admin-section hidden" data-section="shortvideos">
                     <h3 id="anchor-shortvideos" class="text-xs font-extrabold text-indigo-300 flex items-center gap-2"><i class="fa-solid fa-film"></i> Short Videos (Dashboard Reels)</h3>
                     <div class="bg-[#0f0c1a] border border-slate-800 p-5 rounded-2xl space-y-4 shadow-inner">
-                        <p class="text-[10px] text-slate-500 leading-relaxed">Square, short (TikTok/Shorts-style) math videos. Upload a video file below, or paste a direct video link. These appear as a swipeable "Short Videos" strip on the student dashboard.</p>
+                        <p class="text-[10px] text-slate-500 leading-relaxed">Square, short (TikTok/Shorts-style) math videos. Upload a video file below (up to 500MB — large files may take a while to upload depending on your connection), or paste a direct video link. These appear as a swipeable "Short Videos" strip on the student dashboard.</p>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Title / Caption</label>
@@ -2246,10 +2296,10 @@
                             </div>
                             <div>
                                 <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Video Link (or upload below)</label>
-                                <input type="text" id="admin-video-link" placeholder="https://... (direct .mp4 link)" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white mt-1 focus:border-indigo-500 focus:outline-none transition">
+                                <input type="text" id="admin-video-link" placeholder="https://... (direct .mp4 link, or a YouTube link)" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white mt-1 focus:border-indigo-500 focus:outline-none transition">
                             </div>
                         </div>
-                        <label class="flex items-center justify-center gap-2 w-full bg-[#161224] hover:bg-[#1c1730] border border-dashed border-slate-700 rounded-xl px-3.5 py-3 text-[11px] font-bold text-slate-300 cursor-pointer transition">
+                        <label class="flex items-center justify-center gap-2 w-full bg-[#161224] hover:bg-slate-800 border border-dashed border-slate-700 rounded-xl px-3.5 py-3 text-[11px] font-bold text-slate-300 cursor-pointer transition">
                             <i class="fa-solid fa-upload"></i> <span id="admin-video-upload-label">Upload a short video file (square, under a minute recommended)</span>
                             <input type="file" accept="video/*" class="hidden" onchange="handleVideoFileSelect(this, 'admin-video-link', 'admin-video-upload-label')">
                         </label>
@@ -2336,6 +2386,14 @@
                                 <label class="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-indigo-300 hover:text-indigo-200 cursor-pointer transition w-fit">
                                     <i class="fa-solid fa-upload"></i> <span id="admin-banner-upload-label">පින්තූරයක් Upload කරන්න</span>
                                     <input type="file" accept="image/*" class="hidden" onchange="handleImageFileSelect(this, 'admin-dashboard-banner', 'admin-banner-upload-label', 'site-appearance')">
+                                </label>
+                            </div>
+                            <div class="space-y-1 sm:col-span-2">
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Dashboard Welcome Video (auto-plays, muted, when students land on the dashboard)</label>
+                                <input type="text" id="admin-welcome-video" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:border-indigo-500 focus:outline-none transition" placeholder="හිස්ව තියන්න video එකක් නොපෙන්නීමට (direct .mp4 link, or a YouTube link)">
+                                <label class="mt-1.5 flex items-center gap-1.5 text-[10px] font-bold text-indigo-300 hover:text-indigo-200 cursor-pointer transition w-fit">
+                                    <i class="fa-solid fa-upload"></i> <span id="admin-welcome-video-upload-label">Video එකක් Upload කරන්න (max 500MB)</span>
+                                    <input type="file" accept="video/*" class="hidden" onchange="handleVideoFileSelect(this, 'admin-welcome-video', 'admin-welcome-video-upload-label')">
                                 </label>
                             </div>
                         </div>
@@ -2913,32 +2971,37 @@ Answer: B</pre>
 
     <!-- SHORT VIDEOS "REELS" PLAYER (Full-Screen, swipeable) -->
     <div id="reels-player-overlay" class="hidden fixed inset-0 z-[85] bg-black flex items-center justify-center select-none">
-        <button onclick="closeReelsPlayer()" class="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center text-lg cursor-pointer transition hover:bg-black/70"><i class="fa-solid fa-xmark"></i></button>
+        <button onclick="closeReelsPlayer()" class="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center text-lg cursor-pointer transition hover:bg-white/10"><i class="fa-solid fa-xmark"></i></button>
         <div id="reels-index-badge" class="absolute top-4 right-4 z-20 text-[11px] font-bold text-white bg-black/50 border border-white/20 px-3 py-1.5 rounded-full">1 / 1</div>
 
         <div id="reels-stage" class="relative w-full h-full flex items-center justify-center overflow-hidden">
             <div id="reels-video-wrap" class="relative bg-black rounded-2xl overflow-hidden shadow-2xl" style="width:min(88vw,520px); aspect-ratio:1/1;">
-                <video id="reels-video" class="w-full h-full object-contain bg-black" playsinline webkit-playsinline></video>
+                <video id="reels-video" class="w-full h-full bg-black" style="object-fit:contain;" playsinline webkit-playsinline></video>
+                <iframe id="reels-video-yt" class="hidden w-full h-full" style="border:0;" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
                 <div id="reels-tap-layer" class="absolute inset-0 cursor-pointer" onclick="toggleReelsPlayPause()"></div>
                 <div id="reels-center-play-icon" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div class="w-16 h-16 rounded-full bg-black/45 flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-play ml-1"></i></div>
+                    <div class="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-play ml-1"></i></div>
                 </div>
-                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
+                <div class="absolute bottom-0 left-0 right-0 p-4 pointer-events-none" style="background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);">
                     <p id="reels-video-title" class="text-white text-sm font-bold truncate"></p>
                 </div>
             </div>
         </div>
 
-        <!-- Right-side control rail: prev / next / mute+volume / fullscreen / play-pause -->
-        <div class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
-            <button onclick="reelsPrev()" title="Previous" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-chevron-up"></i></button>
-            <button onclick="reelsNext()" title="Next" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-chevron-down"></i></button>
-            <div class="flex flex-col items-center gap-1.5 bg-black/50 border border-white/20 rounded-2xl py-2.5 px-2">
-                <button onclick="toggleReelsMute()" title="Mute / Unmute" class="w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer"><i class="fa-solid fa-volume-high" id="reels-mute-icon"></i></button>
-                <input type="range" id="reels-volume-slider" min="0" max="100" value="100" oninput="setReelsVolume(this.value)" class="w-16 accent-indigo-500" title="Volume">
+        <!-- Right-side control rail: prev / next / mute+volume / fullscreen / play-pause.
+             The mute/volume/play-pause group only applies to native video files — YouTube
+             clips are hidden (YouTube's own embedded controls handle sound/pause instead). -->
+        <div class="absolute right-3 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
+            <button onclick="reelsPrev()" title="Previous" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-white/10 transition"><i class="fa-solid fa-chevron-up"></i></button>
+            <button onclick="reelsNext()" title="Next" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-white/10 transition"><i class="fa-solid fa-chevron-down"></i></button>
+            <div id="reels-native-controls" class="flex flex-col items-center gap-3">
+                <div class="flex flex-col items-center gap-1.5 bg-black/50 border border-white/20 rounded-2xl py-2.5 px-2">
+                    <button onclick="toggleReelsMute()" title="Mute / Unmute" class="w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer"><i class="fa-solid fa-volume-high" id="reels-mute-icon"></i></button>
+                    <input type="range" id="reels-volume-slider" min="0" max="100" value="100" oninput="setReelsVolume(this.value)" class="w-16 accent-indigo-500" title="Volume">
+                </div>
+                <button onclick="toggleReelsPlayPause()" title="Play / Pause" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-white/10 transition"><i class="fa-solid fa-pause" id="reels-playpause-icon"></i></button>
             </div>
-            <button onclick="toggleReelsPlayPause()" title="Play / Pause" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-pause" id="reels-playpause-icon"></i></button>
-            <button onclick="toggleReelsFullscreen()" title="Fullscreen" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-expand" id="reels-fullscreen-icon"></i></button>
+            <button onclick="toggleReelsFullscreen()" title="Fullscreen" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-white/10 transition"><i class="fa-solid fa-expand" id="reels-fullscreen-icon"></i></button>
         </div>
     </div>
 
@@ -3363,6 +3426,7 @@ Answer: B</pre>
                 } else {
                     if (typeof setupStudentDashboard === 'function') setupStudentDashboard();
                     if (typeof renderShortVideosStrip === 'function') renderShortVideosStrip();
+                    if (typeof applySiteAssets === 'function') applySiteAssets();
                     const progressSec = document.getElementById('progress-section');
                     if (progressSec && !progressSec.classList.contains('hidden') && typeof renderChart === 'function') renderChart();
                     if (typeof renderGoals === 'function') renderGoals();
@@ -4589,7 +4653,8 @@ Answer: B</pre>
             showToast(currentLang === 'si' ? `සිසුන් ${students.length} දෙනාගෙන්ම access ඉවත් කරන ලදී` : `Access revoked from ${students.length} students`, 'info');
         }
 
-        let siteAssets = JSON.parse(localStorage.getItem('moramaths_site_assets')) || { heroImage: '', dashboardBanner: '' };
+        let siteAssets = JSON.parse(localStorage.getItem('moramaths_site_assets')) || { heroImage: '', dashboardBanner: '', welcomeVideo: '' };
+        let welcomeVideoDismissed = false;
 
         /* Controls which "papers" (quizzes) feed the student progress graph on the
            dashboard — set by an admin, shared/synced to every device like the rest of
@@ -8365,14 +8430,17 @@ Answer: B</pre>
         function renderAdminAppearanceForm() {
             const heroInput = document.getElementById('admin-hero-image');
             const bannerInput = document.getElementById('admin-dashboard-banner');
+            const welcomeVideoInput = document.getElementById('admin-welcome-video');
             if (heroInput) heroInput.value = siteAssets.heroImage || '';
             if (bannerInput) bannerInput.value = siteAssets.dashboardBanner || '';
+            if (welcomeVideoInput) welcomeVideoInput.value = siteAssets.welcomeVideo || '';
             renderAdminAccountsList();
         }
 
         function saveSiteAppearance() {
             siteAssets.heroImage = document.getElementById('admin-hero-image').value.trim();
             siteAssets.dashboardBanner = document.getElementById('admin-dashboard-banner').value.trim();
+            siteAssets.welcomeVideo = document.getElementById('admin-welcome-video').value.trim();
             localStorage.setItem('moramaths_site_assets', JSON.stringify(siteAssets));
             cloudPush();
             applySiteAssets();
@@ -8451,6 +8519,55 @@ Answer: B</pre>
                     banner.style.opacity = '0.5';
                 }
             }
+            const welcomeSection = document.getElementById('welcome-video-section');
+            const welcomePlayer = document.getElementById('welcome-video-player');
+            const welcomeYtFrame = document.getElementById('welcome-video-yt');
+            const welcomeMuteBtn = document.getElementById('welcome-video-mute-btn');
+            if (welcomeSection && welcomePlayer && welcomeYtFrame) {
+                if (siteAssets.welcomeVideo && !welcomeVideoDismissed) {
+                    const ytId = extractYouTubeId(siteAssets.welcomeVideo);
+                    welcomeSection.classList.remove('hidden');
+                    if (ytId) {
+                        // YouTube link — embed YouTube's own player (muted autoplay, its own
+                        // on-screen controls). Our custom mute button doesn't apply here.
+                        welcomePlayer.pause(); welcomePlayer.removeAttribute('src');
+                        welcomePlayer.classList.add('hidden');
+                        welcomeYtFrame.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1`;
+                        welcomeYtFrame.classList.remove('hidden');
+                        if (welcomeMuteBtn) welcomeMuteBtn.classList.add('hidden');
+                    } else {
+                        welcomeYtFrame.src = ''; welcomeYtFrame.classList.add('hidden');
+                        welcomePlayer.classList.remove('hidden');
+                        if (welcomeMuteBtn) welcomeMuteBtn.classList.remove('hidden');
+                        if (welcomePlayer.getAttribute('src') !== siteAssets.welcomeVideo) {
+                            welcomePlayer.src = siteAssets.welcomeVideo;
+                        }
+                        welcomePlayer.play().catch(() => { /* browser may still block until a user gesture — the video stays muted so this is rare */ });
+                    }
+                } else {
+                    welcomeSection.classList.add('hidden');
+                    welcomePlayer.pause();
+                    welcomeYtFrame.src = '';
+                }
+            }
+        }
+
+        function dismissWelcomeVideo() {
+            welcomeVideoDismissed = true;
+            const section = document.getElementById('welcome-video-section');
+            const player = document.getElementById('welcome-video-player');
+            const ytFrame = document.getElementById('welcome-video-yt');
+            if (player) player.pause();
+            if (ytFrame) ytFrame.src = '';
+            if (section) section.classList.add('hidden');
+        }
+
+        function toggleWelcomeVideoMute() {
+            const player = document.getElementById('welcome-video-player');
+            if (!player) return;
+            player.muted = !player.muted;
+            const icon = document.getElementById('welcome-video-mute-icon');
+            if (icon) icon.className = player.muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high';
         }
 
         window.onload = bootstrapApp;
