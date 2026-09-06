@@ -1148,6 +1148,218 @@
             renderAdminSongPlaylists();
         }
 
+        /* ============ SHORT VIDEOS — ADMIN (upload/manage) ============ */
+        function handleVideoFileSelect(inputEl, targetFieldId, labelId) {
+            const file = inputEl.files && inputEl.files[0];
+            if (!file) return;
+            const labelEl = labelId ? document.getElementById(labelId) : null;
+            const defaultLabel = 'Upload a short video file (square, under a minute recommended)';
+            const resetLabel = () => { if (labelEl) labelEl.innerText = defaultLabel; };
+            if (!file.type.startsWith('video/')) {
+                showToast("Please choose a video file.", 'error');
+                inputEl.value = ''; resetLabel();
+                return;
+            }
+            const MAX_BYTES = 60 * 1024 * 1024; // 60MB — generous for a short square clip
+            if (file.size > MAX_BYTES) {
+                showToast("Video is too large (please choose under 60MB, or trim it shorter).", 'error');
+                inputEl.value = ''; resetLabel();
+                return;
+            }
+            if (!storageReady) {
+                showToast("File upload isn't enabled yet (R2 Worker not set up). Please paste a direct video link instead for now.", 'error');
+                inputEl.value = ''; resetLabel();
+                return;
+            }
+            if (labelEl) labelEl.innerText = 'Uploading...';
+            uploadFileToR2(file, 'short-videos').then(url => {
+                document.getElementById(targetFieldId).value = url;
+                if (labelEl) labelEl.innerText = `✓ ${file.name}`;
+                showToast("Video uploaded!", 'success');
+            }).catch(err => {
+                console.warn('Video upload error:', err);
+                showToast(`Upload failed: ${err.message}`, 'error');
+                resetLabel();
+            }).finally(() => { inputEl.value = ''; });
+        }
+
+        function addShortVideo() {
+            const titleEl = document.getElementById('admin-video-title');
+            const linkEl = document.getElementById('admin-video-link');
+            const title = titleEl.value.trim();
+            const url = linkEl.value.trim();
+            if (!url) { showToast("Add a video file or paste a video link first", 'error'); return; }
+            shortVideos.push({ id: uid(), title: title || 'Untitled', url, createdAt: Date.now() });
+            try {
+                saveShortVideos();
+                cloudPush();
+            } catch (err) {
+                shortVideos.pop();
+                showToast("Storage full! Try a smaller video or a link instead.", 'error');
+                return;
+            }
+            titleEl.value = ''; linkEl.value = '';
+            const uploadLabel = document.getElementById('admin-video-upload-label');
+            if (uploadLabel) uploadLabel.innerText = 'Upload a short video file (square, under a minute recommended)';
+            renderAdminShortVideos();
+            renderShortVideosStrip();
+            showToast("Short video added!", 'success');
+        }
+
+        function deleteShortVideo(id) {
+            if (!confirm("Remove this short video?")) return;
+            shortVideos = shortVideos.filter(v => v.id !== id);
+            saveShortVideos();
+            cloudPush();
+            renderAdminShortVideos();
+            renderShortVideosStrip();
+        }
+
+        function renderAdminShortVideos() {
+            const wrap = document.getElementById('admin-shortvideos-list');
+            const empty = document.getElementById('admin-shortvideos-empty');
+            if (!wrap) return;
+            if (!shortVideos.length) {
+                wrap.innerHTML = '';
+                if (empty) empty.classList.remove('hidden');
+                return;
+            }
+            if (empty) empty.classList.add('hidden');
+            wrap.innerHTML = shortVideos.map(v => `
+                <div class="relative group bg-[#161224] border border-slate-800 rounded-xl overflow-hidden">
+                    <video src="${v.url}" class="w-full aspect-square object-cover bg-black" muted preload="metadata"></video>
+                    <button onclick="deleteShortVideo('${v.id}')" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-md bg-black/60 hover:bg-rose-600 text-white flex items-center justify-center text-[10px] cursor-pointer transition"><i class="fa-solid fa-xmark"></i></button>
+                    <p class="text-[10px] font-semibold text-slate-300 px-2 py-1.5 truncate">${escapeHtml(v.title || 'Untitled')}</p>
+                </div>
+            `).join('');
+        }
+
+        /* ============ SHORT VIDEOS — STUDENT DASHBOARD STRIP + FULL-SCREEN "REELS" PLAYER ============ */
+        function renderShortVideosStrip() {
+            const section = document.getElementById('short-videos-section');
+            const strip = document.getElementById('short-videos-strip');
+            if (!section || !strip) return;
+            if (!shortVideos.length) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+            strip.innerHTML = shortVideos.map((v, i) => `
+                <button onclick="openReelsPlayer(${i})" class="relative shrink-0 w-28 h-28 sm:w-32 sm:h-32 rounded-2xl overflow-hidden border border-slate-800 bg-black cursor-pointer group">
+                    <video src="${v.url}" class="w-full h-full object-cover" muted preload="metadata"></video>
+                    <div class="absolute inset-0 bg-black/20 group-hover:bg-black/35 transition flex items-center justify-center">
+                        <div class="w-8 h-8 rounded-full bg-white/25 backdrop-blur-sm flex items-center justify-center text-white text-xs"><i class="fa-solid fa-play ml-0.5"></i></div>
+                    </div>
+                    <p class="absolute bottom-1 left-1.5 right-1.5 text-[9px] font-bold text-white truncate drop-shadow">${escapeHtml(v.title || '')}</p>
+                </button>
+            `).join('');
+        }
+
+        let reelsCurrentIndex = 0;
+        let reelsTouchStartY = null;
+
+        function openReelsPlayer(index) {
+            if (!shortVideos.length) return;
+            reelsCurrentIndex = index;
+            document.getElementById('reels-player-overlay').classList.remove('hidden');
+            document.addEventListener('keydown', reelsKeydownHandler);
+            const stage = document.getElementById('reels-stage');
+            stage.addEventListener('touchstart', reelsTouchStart, { passive: true });
+            stage.addEventListener('touchend', reelsTouchEnd, { passive: true });
+            loadReelsVideo();
+        }
+
+        function closeReelsPlayer() {
+            const video = document.getElementById('reels-video');
+            video.pause();
+            video.src = '';
+            document.getElementById('reels-player-overlay').classList.add('hidden');
+            document.removeEventListener('keydown', reelsKeydownHandler);
+            const stage = document.getElementById('reels-stage');
+            stage.removeEventListener('touchstart', reelsTouchStart);
+            stage.removeEventListener('touchend', reelsTouchEnd);
+            if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+        }
+
+        function loadReelsVideo() {
+            const v = shortVideos[reelsCurrentIndex];
+            if (!v) return;
+            const video = document.getElementById('reels-video');
+            video.src = v.url;
+            video.currentTime = 0;
+            video.onended = () => reelsNext();
+            video.onplay = () => updateReelsPlayPauseIcon(true);
+            video.onpause = () => updateReelsPlayPauseIcon(false);
+            video.play().catch(() => { /* autoplay-with-sound may be blocked on some browsers — user can tap to play */ });
+            document.getElementById('reels-video-title').innerText = v.title || '';
+            document.getElementById('reels-index-badge').innerText = `${reelsCurrentIndex + 1} / ${shortVideos.length}`;
+        }
+
+        function reelsNext() {
+            if (reelsCurrentIndex < shortVideos.length - 1) { reelsCurrentIndex++; loadReelsVideo(); }
+        }
+
+        function reelsPrev() {
+            if (reelsCurrentIndex > 0) { reelsCurrentIndex--; loadReelsVideo(); }
+        }
+
+        function toggleReelsPlayPause() {
+            const video = document.getElementById('reels-video');
+            if (video.paused) video.play().catch(() => {}); else video.pause();
+        }
+
+        function updateReelsPlayPauseIcon(isPlaying) {
+            const icon = document.getElementById('reels-playpause-icon');
+            const centerIcon = document.getElementById('reels-center-play-icon');
+            if (icon) icon.className = isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+            if (centerIcon) centerIcon.classList.toggle('hidden', isPlaying);
+        }
+
+        function toggleReelsMute() {
+            const video = document.getElementById('reels-video');
+            video.muted = !video.muted;
+            const icon = document.getElementById('reels-mute-icon');
+            if (icon) icon.className = video.muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high';
+            const slider = document.getElementById('reels-volume-slider');
+            if (slider) slider.value = video.muted ? 0 : Math.round(video.volume * 100);
+        }
+
+        function setReelsVolume(val) {
+            const video = document.getElementById('reels-video');
+            const vol = Math.max(0, Math.min(100, Number(val))) / 100;
+            video.volume = vol;
+            video.muted = vol === 0;
+            const icon = document.getElementById('reels-mute-icon');
+            if (icon) icon.className = video.muted ? 'fa-solid fa-volume-xmark' : (vol < 0.5 ? 'fa-solid fa-volume-low' : 'fa-solid fa-volume-high');
+        }
+
+        function toggleReelsFullscreen() {
+            const el = document.getElementById('reels-player-overlay');
+            const icon = document.getElementById('reels-fullscreen-icon');
+            if (!document.fullscreenElement) {
+                el.requestFullscreen().then(() => { if (icon) icon.className = 'fa-solid fa-compress'; }).catch(() => {});
+            } else {
+                document.exitFullscreen().then(() => { if (icon) icon.className = 'fa-solid fa-expand'; }).catch(() => {});
+            }
+        }
+
+        function reelsKeydownHandler(e) {
+            if (document.getElementById('reels-player-overlay').classList.contains('hidden')) return;
+            if (e.key === 'Escape') closeReelsPlayer();
+            else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') reelsPrev();
+            else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') reelsNext();
+            else if (e.key === ' ') { e.preventDefault(); toggleReelsPlayPause(); }
+        }
+
+        function reelsTouchStart(e) {
+            reelsTouchStartY = e.touches[0].clientY;
+        }
+
+        function reelsTouchEnd(e) {
+            if (reelsTouchStartY === null) return;
+            const deltaY = e.changedTouches[0].clientY - reelsTouchStartY;
+            reelsTouchStartY = null;
+            if (Math.abs(deltaY) < 50) return; // small movement — treat as a tap, not a swipe
+            if (deltaY < 0) reelsNext(); else reelsPrev();
+        }
+
         /* Small top-of-screen control: true pause/resume (freezes the whole audio
            context in place) rather than stopping and losing the selected track. */
         function toggleFocusPlayPause() {
@@ -1292,6 +1504,7 @@
                 <div class="sidebar-link admin-nav-link" data-section="goals" onclick="showAdminSection('goals')"><i class="fa-solid fa-bullseye w-4 text-center text-purple-400"></i> <span>Goals</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="pastpapers-admin" onclick="showAdminSection('pastpapers-admin')"><i class="fa-solid fa-file-lines w-4 text-center text-sky-400"></i> <span>Papers</span></div>
                 <div class="sidebar-link admin-nav-link" data-section="songs" onclick="showAdminSection('songs')"><i class="fa-brands fa-youtube w-4 text-center text-sky-400"></i> <span>Song Playlists</span></div>
+                <div class="sidebar-link admin-nav-link" data-section="shortvideos" onclick="showAdminSection('shortvideos')"><i class="fa-solid fa-film w-4 text-center text-sky-400"></i> <span>Short Videos</span></div>
                 <div class="sidebar-link admin-nav-link master-admin-only hidden" data-section="contact-settings" onclick="showAdminSection('contact-settings')"><i class="fa-solid fa-headset w-4 text-center text-amber-400"></i> <span>Contact Settings</span></div>
                 <div class="sidebar-link admin-nav-link master-admin-only hidden" data-section="appearance" onclick="showAdminSection('appearance')"><i class="fa-solid fa-image w-4 text-center text-amber-400"></i> <span>Site Appearance</span></div>
                 <div class="sidebar-link admin-nav-link master-admin-only hidden" data-section="admin-accounts" onclick="showAdminSection('admin-accounts')"><i class="fa-solid fa-user-shield w-4 text-center text-amber-400"></i> <span>Admin Accounts</span></div>
@@ -1545,6 +1758,13 @@
                     </div>
                 </button>
             </div>
+        </div>
+
+        <!-- SHORT VIDEOS ("Reels") — square short-video strip. Tap a tile to open the
+             full-screen swipeable player (see #reels-player-overlay near the end of body). -->
+        <div id="short-videos-section" class="hidden dash-fade-in dash-fade-4 bg-[#161224]/90 backdrop-blur-2xl border border-slate-800/80 p-5 sm:p-6 rounded-3xl shadow-xl space-y-4">
+            <h3 class="text-sm font-extrabold text-indigo-300 flex items-center gap-2"><i class="fa-solid fa-film"></i> <span id="txt-short-videos-title">Short Videos</span></h3>
+            <div id="short-videos-strip" class="flex gap-3 overflow-x-auto pb-1" style="scrollbar-width: thin;"></div>
         </div>
 
         <!-- MY PROGRESS — score chart, goals, study streak (own sidebar-accessible section,
@@ -2011,6 +2231,31 @@
                             <p class="text-[9px] text-slate-500">If this shows a playback error (e.g. "Error 153"), that video's owner has disabled embedding — pick a different link before adding it.</p>
                         </div>
                         <p class="text-[9px] text-slate-600">Please only link songs you have the right to share — this embeds YouTube's official player, it doesn't store any audio on this site.</p>
+                    </div>
+                </div>
+
+                <!-- SHORT VIDEOS MANAGER (square "Reels"-style short video feed shown on the student dashboard) -->
+                <div class="admin-section hidden" data-section="shortvideos">
+                    <h3 id="anchor-shortvideos" class="text-xs font-extrabold text-indigo-300 flex items-center gap-2"><i class="fa-solid fa-film"></i> Short Videos (Dashboard Reels)</h3>
+                    <div class="bg-[#0f0c1a] border border-slate-800 p-5 rounded-2xl space-y-4 shadow-inner">
+                        <p class="text-[10px] text-slate-500 leading-relaxed">Square, short (TikTok/Shorts-style) math videos. Upload a video file below, or paste a direct video link. These appear as a swipeable "Short Videos" strip on the student dashboard.</p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Title / Caption</label>
+                                <input type="text" id="admin-video-title" placeholder="e.g. Solving quadratic equations in 30s" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white mt-1 focus:border-indigo-500 focus:outline-none transition">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Video Link (or upload below)</label>
+                                <input type="text" id="admin-video-link" placeholder="https://... (direct .mp4 link)" class="w-full bg-[#161224] border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white mt-1 focus:border-indigo-500 focus:outline-none transition">
+                            </div>
+                        </div>
+                        <label class="flex items-center justify-center gap-2 w-full bg-[#161224] hover:bg-[#1c1730] border border-dashed border-slate-700 rounded-xl px-3.5 py-3 text-[11px] font-bold text-slate-300 cursor-pointer transition">
+                            <i class="fa-solid fa-upload"></i> <span id="admin-video-upload-label">Upload a short video file (square, under a minute recommended)</span>
+                            <input type="file" accept="video/*" class="hidden" onchange="handleVideoFileSelect(this, 'admin-video-link', 'admin-video-upload-label')">
+                        </label>
+                        <button onclick="addShortVideo()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold py-3 rounded-xl transition cursor-pointer shadow-lg"><i class="fa-solid fa-plus mr-1.5"></i> Add Short Video</button>
+                        <div id="admin-shortvideos-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 pt-2"></div>
+                        <p id="admin-shortvideos-empty" class="hidden text-center text-[10px] text-slate-600 py-4">No short videos uploaded yet.</p>
                     </div>
                 </div>
 
@@ -2666,6 +2911,37 @@ Answer: B</pre>
         </div>
     </div>
 
+    <!-- SHORT VIDEOS "REELS" PLAYER (Full-Screen, swipeable) -->
+    <div id="reels-player-overlay" class="hidden fixed inset-0 z-[85] bg-black flex items-center justify-center select-none">
+        <button onclick="closeReelsPlayer()" class="absolute top-4 left-4 z-20 w-10 h-10 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center text-lg cursor-pointer transition hover:bg-black/70"><i class="fa-solid fa-xmark"></i></button>
+        <div id="reels-index-badge" class="absolute top-4 right-4 z-20 text-[11px] font-bold text-white bg-black/50 border border-white/20 px-3 py-1.5 rounded-full">1 / 1</div>
+
+        <div id="reels-stage" class="relative w-full h-full flex items-center justify-center overflow-hidden">
+            <div id="reels-video-wrap" class="relative bg-black rounded-2xl overflow-hidden shadow-2xl" style="width:min(88vw,520px); aspect-ratio:1/1;">
+                <video id="reels-video" class="w-full h-full object-contain bg-black" playsinline webkit-playsinline></video>
+                <div id="reels-tap-layer" class="absolute inset-0 cursor-pointer" onclick="toggleReelsPlayPause()"></div>
+                <div id="reels-center-play-icon" class="hidden absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div class="w-16 h-16 rounded-full bg-black/45 flex items-center justify-center text-white text-2xl"><i class="fa-solid fa-play ml-1"></i></div>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent pointer-events-none">
+                    <p id="reels-video-title" class="text-white text-sm font-bold truncate"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right-side control rail: prev / next / mute+volume / fullscreen / play-pause -->
+        <div class="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center gap-3">
+            <button onclick="reelsPrev()" title="Previous" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-chevron-up"></i></button>
+            <button onclick="reelsNext()" title="Next" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-chevron-down"></i></button>
+            <div class="flex flex-col items-center gap-1.5 bg-black/50 border border-white/20 rounded-2xl py-2.5 px-2">
+                <button onclick="toggleReelsMute()" title="Mute / Unmute" class="w-8 h-8 rounded-full text-white flex items-center justify-center cursor-pointer"><i class="fa-solid fa-volume-high" id="reels-mute-icon"></i></button>
+                <input type="range" id="reels-volume-slider" min="0" max="100" value="100" oninput="setReelsVolume(this.value)" class="w-16 accent-indigo-500" title="Volume">
+            </div>
+            <button onclick="toggleReelsPlayPause()" title="Play / Pause" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-pause" id="reels-playpause-icon"></i></button>
+            <button onclick="toggleReelsFullscreen()" title="Fullscreen" class="w-11 h-11 rounded-full bg-black/50 border border-white/20 text-white flex items-center justify-center cursor-pointer hover:bg-black/70 transition"><i class="fa-solid fa-expand" id="reels-fullscreen-icon"></i></button>
+        </div>
+    </div>
+
     <!-- TOAST CONTAINER -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-2.5 items-end"></div>
 
@@ -2965,6 +3241,7 @@ Answer: B</pre>
                 ? getUnreadAdminMessageCount(currentUser.username) : 0;
             if (data.studentMessages) { studentMessages = data.studentMessages; localStorage.setItem('moramaths_messages', JSON.stringify(studentMessages)); }
             if (data.songPlaylists) { songPlaylists = data.songPlaylists; localStorage.setItem('moramaths_songplaylists', JSON.stringify(songPlaylists)); }
+            if (data.shortVideos) { shortVideos = data.shortVideos; saveShortVideos(); }
             if (typeof data.nextStudentIdSeq === 'number' && data.nextStudentIdSeq > nextStudentIdSeq) {
                 nextStudentIdSeq = data.nextStudentIdSeq;
                 localStorage.setItem('moramaths_next_student_id', String(nextStudentIdSeq));
@@ -3057,7 +3334,7 @@ Answer: B</pre>
             }
             const payload = stripUndefinedDeep({
                 users: usersToPush, weeksDataSi, weeksDataEn, zoomData, notifications, siteAssets, progressGraphConfig, goalsData,
-                pastPapersData, contactData, studentMessages, songPlaylists, nextStudentIdSeq,
+                pastPapersData, contactData, studentMessages, songPlaylists, nextStudentIdSeq, shortVideos,
                 updatedAt: Date.now()
             });
             try {
@@ -3079,11 +3356,13 @@ Answer: B</pre>
                     if (typeof populateAdminGraphScopeSelect === 'function') populateAdminGraphScopeSelect();
                     if (typeof renderAdminPastPapers === 'function') renderAdminPastPapers();
                     if (typeof renderAdminSongPlaylists === 'function') renderAdminSongPlaylists();
+                    if (typeof renderAdminShortVideos === 'function') renderAdminShortVideos();
                     if (typeof renderAdminMessagesInbox === 'function') renderAdminMessagesInbox();
                     if (viewedMessageThreadUsername && typeof openAdminMessageThread === 'function') openAdminMessageThread(viewedMessageThreadUsername);
                     if (typeof renderAdminLiveToggle === 'function') renderAdminLiveToggle();
                 } else {
                     if (typeof setupStudentDashboard === 'function') setupStudentDashboard();
+                    if (typeof renderShortVideosStrip === 'function') renderShortVideosStrip();
                     const progressSec = document.getElementById('progress-section');
                     if (progressSec && !progressSec.classList.contains('hidden') && typeof renderChart === 'function') renderChart();
                     if (typeof renderGoals === 'function') renderGoals();
@@ -4452,6 +4731,8 @@ Answer: B</pre>
             document.getElementById('txt-pastpapers-title').innerText = currentLang === 'si' ? 'ප්‍රශ්න පත්‍ර' : 'Papers';
             document.getElementById('txt-sidebar-contact').innerText = currentLang === 'si' ? 'අප අමතන්න' : 'Contact Us';
             document.getElementById('txt-contact-title').innerText = currentLang === 'si' ? 'අප අමතන්න' : 'Contact Us';
+            const shortVidTitleEl = document.getElementById('txt-short-videos-title');
+            if (shortVidTitleEl) shortVidTitleEl.innerText = currentLang === 'si' ? 'කෙටි වීඩියෝ' : 'Short Videos';
             document.getElementById('txt-sidebar-account').innerText = t.sidebarAccount;
             document.getElementById('txt-sidebar-profile').innerText = t.sidebarProfile;
             document.getElementById('txt-sidebar-logout').innerText = t.logout;
@@ -4556,6 +4837,14 @@ Answer: B</pre>
         let notifications = JSON.parse(localStorage.getItem('moramaths_notifications')) || [
             { id: uid(), text: currentLang === 'si' ? "MathLab වෙත සාදරයෙන් පිළිගනිමු! 🎉" : "Welcome to MathLab! 🎉", date: Date.now() }
         ];
+
+        /* ============ SHORT VIDEOS ("Reels") ============
+           Square, swipeable short-video feed. Each item: { id, title, url, createdAt }.
+           url is an R2-hosted video file (uploaded via the admin panel) or a pasted direct link. */
+        let shortVideos = JSON.parse(localStorage.getItem('moramaths_short_videos')) || [];
+        function saveShortVideos() {
+            localStorage.setItem('moramaths_short_videos', JSON.stringify(shortVideos));
+        }
 
         let tempRegData = null;
         let progressChartInstance = null;
@@ -4786,6 +5075,7 @@ Answer: B</pre>
                     loadAdminContactForm();
                     renderAdminMessagesInbox();
                     renderAdminSongPlaylists();
+                    renderAdminShortVideos();
                     checkDefaultPasswordWarning();
                     document.getElementById('admin-role-badge').innerText = isMasterAdmin(currentUser) ? 'Master Admin' : 'Admin';
                     renderAdminStatsOverview();
@@ -5247,6 +5537,7 @@ Answer: B</pre>
             renderGoals();
             renderGamification();
             syncDashboardFloatLayer();
+            renderShortVideosStrip();
         }
 
         /* ============ GOALS & ACHIEVEMENTS (admin selects the metric; values are auto-computed per student) ============ */
