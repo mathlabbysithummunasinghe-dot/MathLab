@@ -1242,30 +1242,67 @@
             }).join('');
         }
 
-        /* ============ SHORT VIDEOS — STUDENT DASHBOARD STRIP + FULL-SCREEN "REELS" PLAYER ============ */
+        /* ============ SHORT VIDEOS — DASHBOARD MINI AUTO-PLAY PLAYER + FULL-SCREEN "REELS" PLAYER ============
+           The dashboard shows one small always-playing (muted) preview rather than a row of
+           static tap-to-play thumbnails. It cycles through the list on its own; tapping it
+           opens the full-screen swipeable "reels" experience at the same video. */
+        let miniShortVideoIndex = 0;
+
         function renderShortVideosStrip() {
             const section = document.getElementById('short-videos-section');
-            const strip = document.getElementById('short-videos-strip');
-            if (!section || !strip) return;
+            if (!section) return;
             if (!shortVideos.length) { section.classList.add('hidden'); return; }
             section.classList.remove('hidden');
-            strip.innerHTML = shortVideos.map((v, i) => {
-                const ytId = extractYouTubeId(v.url);
-                const mediaHtml = ytId
-                    ? `<img src="https://img.youtube.com/vi/${ytId}/hqdefault.jpg" class="w-full h-full object-cover" alt="">`
-                    : `<video src="${v.url}" class="w-full h-full object-cover" muted preload="metadata"></video>`;
-                const ytBadge = ytId ? `<span class="absolute top-2 left-2 text-rose-500 text-sm drop-shadow z-10"><i class="fa-brands fa-youtube"></i></span>` : '';
-                return `
-                <button onclick="openReelsPlayer(${i})" class="relative shrink-0 w-28 h-28 rounded-2xl overflow-hidden border border-slate-800 bg-black cursor-pointer group">
-                    ${mediaHtml}
-                    ${ytBadge}
-                    <div class="absolute inset-0 bg-black/20 transition flex items-center justify-center">
-                        <div class="w-8 h-8 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center text-white text-xs"><i class="fa-solid fa-play ml-1"></i></div>
-                    </div>
-                    <p class="absolute text-[9px] font-bold text-white truncate drop-shadow" style="bottom:4px;left:6px;right:6px;">${escapeHtml(v.title || '')}</p>
-                </button>
-            `;
-            }).join('');
+            if (miniShortVideoIndex >= shortVideos.length) miniShortVideoIndex = 0;
+            renderMiniShortVideoDots();
+            loadMiniShortVideo();
+        }
+
+        function renderMiniShortVideoDots() {
+            const dots = document.getElementById('mini-shortvideo-dots');
+            if (!dots) return;
+            dots.innerHTML = shortVideos.map((v, i) => `
+                <button onclick="event.stopPropagation(); playMiniShortVideo(${i})" title="${escapeHtml(v.title || '')}" class="h-2 rounded-full transition cursor-pointer ${i === miniShortVideoIndex ? 'w-5 bg-indigo-400' : 'w-2 bg-slate-700 hover:bg-slate-600'}"></button>
+            `).join('');
+        }
+
+        function playMiniShortVideo(i) {
+            miniShortVideoIndex = i;
+            renderMiniShortVideoDots();
+            loadMiniShortVideo();
+        }
+
+        function loadMiniShortVideo() {
+            const v = shortVideos[miniShortVideoIndex];
+            if (!v) return;
+            const video = document.getElementById('mini-shortvideo-player');
+            const yt = document.getElementById('mini-shortvideo-yt');
+            if (!video || !yt) return;
+            const ytId = extractYouTubeId(v.url);
+            if (ytId) {
+                video.pause(); video.removeAttribute('src'); video.onended = null;
+                video.classList.add('hidden');
+                // autoplay + mute + loop=1&playlist=<id> is YouTube's documented trick for
+                // looping a single video indefinitely inside an embed.
+                yt.src = `https://www.youtube.com/embed/${ytId}?autoplay=1&mute=1&loop=1&playlist=${ytId}&controls=0&modestbranding=1&playsinline=1&rel=0`;
+                yt.classList.remove('hidden');
+            } else {
+                yt.src = ''; yt.classList.add('hidden');
+                video.classList.remove('hidden');
+                video.muted = true;
+                video.src = v.url;
+                video.currentTime = 0;
+                video.onended = () => {
+                    miniShortVideoIndex = (miniShortVideoIndex + 1) % shortVideos.length;
+                    renderMiniShortVideoDots();
+                    loadMiniShortVideo();
+                };
+                video.play().catch(() => { /* autoplay-muted is normally allowed; ignore if the browser still blocks it */ });
+            }
+            const titleEl = document.getElementById('mini-shortvideo-title');
+            if (titleEl) titleEl.innerText = v.title || '';
+            const counter = document.getElementById('mini-shortvideo-counter');
+            if (counter) counter.innerText = `${miniShortVideoIndex + 1} / ${shortVideos.length}`;
         }
 
         let reelsCurrentIndex = 0;
@@ -1808,13 +1845,35 @@
                     </div>
                 </button>
             </div>
-        </div>
 
-        <!-- SHORT VIDEOS ("Reels") — square short-video strip. Tap a tile to open the
-             full-screen swipeable player (see #reels-player-overlay near the end of body). -->
-        <div id="short-videos-section" class="hidden dash-fade-in dash-fade-4 bg-[#161224]/90 backdrop-blur-2xl border border-slate-800/80 p-5 sm:p-6 rounded-3xl shadow-xl space-y-4">
-            <h3 class="text-sm font-extrabold text-indigo-300 flex items-center gap-2"><i class="fa-solid fa-film"></i> <span id="txt-short-videos-title">Short Videos</span></h3>
-            <div id="short-videos-strip" class="flex gap-3 overflow-x-auto pb-1" style="scrollbar-width: thin;"></div>
+            <!-- SHORT VIDEOS ("Reels") — small always-on mini player that auto-plays right
+                 on the dashboard (muted, loops through the list). Tap it to open the
+                 full-screen swipeable player (see #reels-player-overlay near the end of body).
+                 Nested INSIDE #student-dashboard so it only ever shows to a logged-in student —
+                 never on the login/register screen. -->
+            <div id="short-videos-section" class="hidden dash-fade-in dash-fade-4 bg-[#161224]/90 backdrop-blur-2xl border border-slate-800/80 p-5 sm:p-6 rounded-3xl shadow-xl">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-extrabold text-indigo-300 flex items-center gap-2"><i class="fa-solid fa-film"></i> <span id="txt-short-videos-title">Short Videos</span></h3>
+                    <span id="mini-shortvideo-counter" class="text-[10px] font-bold text-slate-500 tabular-nums"></span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div id="mini-shortvideo-player-wrap" onclick="openReelsPlayer(miniShortVideoIndex)" class="relative shrink-0 w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden border border-slate-800 bg-black cursor-pointer group">
+                        <video id="mini-shortvideo-player" class="hidden w-full h-full object-cover" muted autoplay playsinline webkit-playsinline></video>
+                        <iframe id="mini-shortvideo-yt" class="hidden w-full h-full pointer-events-none" style="border:0;" allow="autoplay; encrypted-media"></iframe>
+                        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition flex items-center justify-center">
+                            <div class="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition"><i class="fa-solid fa-expand"></i></div>
+                        </div>
+                        <span class="absolute bottom-1.5 left-1.5 flex items-center gap-1 bg-black/55 text-white text-[8px] font-bold px-1.5 py-0.5 rounded-md">
+                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></span><span id="txt-shortvideo-autoplaying">Auto-playing</span>
+                        </span>
+                    </div>
+                    <div class="min-w-0 flex-1 space-y-2">
+                        <p id="mini-shortvideo-title" class="text-xs sm:text-sm font-bold text-white truncate"></p>
+                        <p id="txt-shortvideo-hint" class="text-[10px] text-slate-500 leading-relaxed">Tap the video to watch fullscreen</p>
+                        <div id="mini-shortvideo-dots" class="flex flex-wrap gap-1.5"></div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- MY PROGRESS — score chart, goals, study streak (own sidebar-accessible section,
@@ -4798,6 +4857,10 @@ Answer: B</pre>
             document.getElementById('txt-contact-title').innerText = currentLang === 'si' ? 'අප අමතන්න' : 'Contact Us';
             const shortVidTitleEl = document.getElementById('txt-short-videos-title');
             if (shortVidTitleEl) shortVidTitleEl.innerText = currentLang === 'si' ? 'කෙටි වීඩියෝ' : 'Short Videos';
+            const shortVidHintEl = document.getElementById('txt-shortvideo-hint');
+            if (shortVidHintEl) shortVidHintEl.innerText = currentLang === 'si' ? 'Full screen බැලීමට වීඩියෝ එක තට්ටු කරන්න' : 'Tap the video to watch fullscreen';
+            const shortVidAutoplayEl = document.getElementById('txt-shortvideo-autoplaying');
+            if (shortVidAutoplayEl) shortVidAutoplayEl.innerText = currentLang === 'si' ? 'ස්වයංක්‍රීයව වාදනය වේ' : 'Auto-playing';
             document.getElementById('txt-sidebar-account').innerText = t.sidebarAccount;
             document.getElementById('txt-sidebar-profile').innerText = t.sidebarProfile;
             document.getElementById('txt-sidebar-logout').innerText = t.logout;
